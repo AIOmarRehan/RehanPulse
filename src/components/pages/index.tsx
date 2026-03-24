@@ -302,23 +302,25 @@ function LiveEventsWidget() {
           </p>
         </div>
       ) : (
-        events.slice(0, 6).map((ev) => (
-          <div
-            key={ev.id}
-            className="flex items-start gap-2 rounded-lg bg-gray-50 px-3 py-2 text-xs dark:bg-white/[0.03]"
-          >
-            <span className="mt-0.5 text-base">
-              {ev.type === 'push' ? '📤' : ev.type.startsWith('pr') ? '🔀' : ev.type === 'ci' ? '⚙️' : ev.type === 'deployment' ? '🚀' : '📌'}
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="truncate text-gray-700 dark:text-white/60">{ev.summary}</p>
-              <div className="flex items-center gap-1.5 text-[10px] text-gray-400 dark:text-white/25">
-                {ev.repo && <span>{ev.repo}</span>}
-                {ev.sender && <><span>·</span><span>{ev.sender}</span></>}
+        <div className="max-h-52 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
+          {events.map((ev) => (
+            <div
+              key={ev.id}
+              className="flex items-start gap-2 rounded-lg bg-gray-50 px-3 py-2 text-xs dark:bg-white/[0.03]"
+            >
+              <span className="mt-0.5 text-base">
+                {ev.type === 'push' ? '📤' : ev.type.startsWith('pr') ? '🔀' : ev.type === 'ci' ? '⚙️' : ev.type === 'deployment' ? '🚀' : '📌'}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="truncate text-gray-700 dark:text-white/60">{ev.summary}</p>
+                <div className="flex items-center gap-1.5 text-[10px] text-gray-400 dark:text-white/25">
+                  {ev.repo && <span>{ev.repo}</span>}
+                  {ev.sender && <><span>·</span><span>{ev.sender}</span></>}
+                </div>
               </div>
             </div>
-          </div>
-        ))
+          ))}
+        </div>
       )}
     </div>
   );
@@ -412,8 +414,8 @@ export function GitHubContent() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            {(data?.repos ?? []).slice(0, 6).map((repo) => (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3 max-h-[32rem] overflow-y-auto pr-1 scrollbar-thin">
+            {(data?.repos ?? []).map((repo) => (
               <a
                 key={repo.id}
                 href={repo.html_url}

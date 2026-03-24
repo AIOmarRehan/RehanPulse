@@ -1,7 +1,11 @@
 import type { Metadata } from 'next';
 import localFont from 'next/font/local';
+import Script from 'next/script';
 import './globals.css';
 import { cn } from '@/lib/utils';
+import { AuthProvider } from '@/components/providers/auth-provider';
+import { ThemeProvider } from '@/components/providers/theme-provider';
+import { QueryProvider } from '@/components/providers/query-provider';
 
 const geistSans = localFont({
   src: './fonts/GeistVF.woff',
@@ -19,14 +23,65 @@ export const metadata: Metadata = {
   description: 'Developer Activity Command Center',
 };
 
+// Inline script that removes the loader when the page is truly ready.
+// Does NOT depend on React — runs as vanilla JS.
+const LOADER_SCRIPT = `
+(function(){
+  function hide(){
+    var el=document.getElementById('__app-loader');
+    if(!el)return;
+    el.style.opacity='0';
+    setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el);},400);
+  }
+  if(document.readyState==='complete'){hide();}
+  else{window.addEventListener('load',hide);}
+  setTimeout(hide,4000);
+})();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn('font-sans', geistSans.variable, geistMono.variable)}>
-      <body className="antialiased">{children}</body>
+    <html lang="en" suppressHydrationWarning className={cn('font-sans', geistSans.variable, geistMono.variable)}>
+      <body className="antialiased">
+        {/* Layout-level loader: pure HTML/CSS, shown before JS loads */}
+        <div
+          id="__app-loader"
+          aria-hidden="true"
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-gray-50 dark:bg-[#0a0a1a]"
+          style={{ transition: 'opacity 0.4s ease-out' }}
+        >
+          <div className="relative h-8 w-8">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div
+                key={i}
+                className="absolute left-1/2 top-0 h-full w-full"
+                style={{
+                  transform: `rotate(${i * 30}deg)`,
+                  animation: `macos-fade 1.2s ${(i * 0.1).toFixed(1)}s infinite linear`,
+                  opacity: 0,
+                }}
+              >
+                <div className="mx-auto h-[26%] w-[8%] rounded-full bg-gray-400 dark:bg-white/60" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Vanilla JS loader removal — doesn't depend on React */}
+        <Script id="__loader-remove" strategy="afterInteractive">{LOADER_SCRIPT}</Script>
+
+        <ThemeProvider>
+          <QueryProvider>
+            <AuthProvider>
+              {children}
+            </AuthProvider>
+          </QueryProvider>
+        </ThemeProvider>
+      </body>
     </html>
   );
 }

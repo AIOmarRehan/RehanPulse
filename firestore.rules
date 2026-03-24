@@ -1,0 +1,38 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users can only read/write their own user document
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Webhook events: users can read, but only Admin SDK can write
+    // (webhook route uses Admin SDK which bypasses these rules)
+    match /webhook_events/{eventId} {
+      allow read: if request.auth != null;
+      allow write: if false; // Only Admin SDK writes
+    }
+
+    // Alert rules: users can manage their own alerts
+    match /alert_rules/{ruleId} {
+      allow read, write: if request.auth != null
+        && resource == null || resource.data.uid == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid;
+    }
+
+    // Notifications: users can read/update their own
+    match /notifications/{notifId} {
+      allow read, update: if request.auth != null
+        && resource.data.uid == request.auth.uid;
+      allow write: if false; // Only Admin SDK writes
+    }
+
+    // Deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

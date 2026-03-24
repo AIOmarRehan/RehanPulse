@@ -67,3 +67,8 @@
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes macos-fade {
+  0%, 40%, 100% { opacity: 0.15; }
+  5% { opacity: 1; }
+}

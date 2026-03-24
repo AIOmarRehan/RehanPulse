@@ -12,6 +12,7 @@ import {
   DeploymentsContent,
   FirebaseContent,
   AlertsContent,
+  SettingsContent,
 } from '@/components/pages';
 import { CommandPalette, type SpotlightAction } from '@/components/spotlight/command-palette';
 
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { icon: '🚀', label: 'Deployments', id: 'deploys' },
   { icon: '🔥', label: 'Firebase', id: 'firebase' },
   { icon: '🔔', label: 'Alerts', id: 'alerts' },
+  { icon: '⚙️', label: 'Settings', id: 'settings' },
 ] as const;
 
 type NavId = (typeof NAV_ITEMS)[number]['id'];
@@ -275,6 +277,7 @@ export function AppShell() {
             {activeNav === 'deploys' && <DeploymentsContent />}
             {activeNav === 'firebase' && <FirebaseContent />}
             {activeNav === 'alerts' && <AlertsContent />}
+            {activeNav === 'settings' && <SettingsContent />}
           </motion.div>
         </main>
       </div>

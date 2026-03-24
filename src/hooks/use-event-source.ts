@@ -14,6 +14,7 @@ const BASE_DELAY = 1000; // 1s
 export function useEventSource() {
   const addEvent = useEventStore((s) => s.addEvent);
   const setConnected = useEventStore((s) => s.setConnected);
+  const setConnectionStatus = useEventStore((s) => s.setConnectionStatus);
   const retriesRef = useRef(0);
   const esRef = useRef<EventSource | null>(null);
   const mountedRef = useRef(true);
@@ -21,6 +22,7 @@ export function useEventSource() {
   const connect = useCallback(() => {
     if (!mountedRef.current) return;
 
+    setConnectionStatus('connecting');
     const es = new EventSource('/api/stream');
     esRef.current = es;
 
@@ -50,7 +52,7 @@ export function useEventSource() {
         setTimeout(connect, delay);
       }
     };
-  }, [addEvent, setConnected]);
+  }, [addEvent, setConnected, setConnectionStatus]);
 
   useEffect(() => {
     mountedRef.current = true;

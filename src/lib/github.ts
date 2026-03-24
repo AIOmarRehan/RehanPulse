@@ -181,3 +181,71 @@ export async function fetchRateLimit(octokit: Octokit): Promise<RateLimitInfo> {
     used: core.used,
   };
 }
+
+/**
+ * Auto-register webhooks on all user-owned repos.
+ * Skips repos that already have a webhook pointing at our URL.
+ * Fire-and-forget — errors are logged but don't block auth.
+ */
+export async function registerWebhooksForUser(
+  githubAccessToken: string,
+  webhookUrl: string,
+  webhookSecret: string,
+): Promise<{ registered: number; skipped: number; errors: number; errorDetails: string[] }> {
+  const octokit = new Octokit({ auth: githubAccessToken });
+  const stats = { registered: 0, skipped: 0, errors: 0, errorDetails: [] as string[] };
+
+  let repos: Array<{ full_name: string }>;
+  try {
+    const { data } = await octokit.rest.repos.listForAuthenticatedUser({
+      sort: 'pushed',
+      per_page: 30,
+      type: 'owner',
+    });
+    repos = data.map((r) => ({ full_name: r.full_name }));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    console.error('Failed to list repos for webhook registration:', msg);
+    stats.errorDetails.push(`Failed to list repos: ${msg}`);
+    return stats;
+  }
+
+  for (const repo of repos) {
+    const [owner, repoName] = repo.full_name.split('/') as [string, string];
+    try {
+      // Check existing hooks — skip if one already points to our URL
+      const { data: hooks } = await octokit.rest.repos.listWebhooks({
+        owner,
+        repo: repoName,
+      });
+      const existing = hooks.some((h) => h.config.url === webhookUrl);
+      if (existing) {
+        stats.skipped++;
+        continue;
+      }
+
+      // Create webhook
+      await octokit.rest.repos.createWebhook({
+        owner,
+        repo: repoName,
+        config: {
+          url: webhookUrl,
+          content_type: 'json',
+          secret: webhookSecret,
+        },
+        events: ['push', 'pull_request', 'deployment', 'workflow_run', 'issues', 'star'],
+        active: true,
+      });
+      stats.registered++;
+    } catch (err) {
+      stats.errors++;
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      console.error(`Webhook error for ${repo.full_name}:`, msg);
+      if (stats.errorDetails.length < 3) {
+        stats.errorDetails.push(`${repo.full_name}: ${msg}`);
+      }
+    }
+  }
+
+  return stats;
+}

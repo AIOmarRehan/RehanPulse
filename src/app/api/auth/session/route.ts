@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase-admin';
 import { encrypt } from '@/lib/crypto';
+import { registerWebhooksForUser } from '@/lib/github';
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,6 +38,23 @@ export async function POST(request: NextRequest) {
         },
         { merge: true },
       );
+
+      // Auto-register webhooks on user's repos (fire-and-forget)
+      const appUrl = request.headers.get('origin') ?? request.nextUrl.origin;
+      const webhookUrl = `${appUrl}/api/webhooks/github`;
+      const webhookSecret = process.env.GITHUB_WEBHOOK_SECRET ?? '';
+      registerWebhooksForUser(githubAccessToken, webhookUrl, webhookSecret)
+        .then(async (stats) => {
+          console.log('Webhook registration:', stats);
+          // Mark in Firestore that webhooks were registered
+          if (stats.registered > 0 || stats.skipped > 0) {
+            await adminDb.collection('users').doc(uid).set(
+              { webhooksRegistered: true },
+              { merge: true },
+            );
+          }
+        })
+        .catch((err) => console.error('Webhook registration failed:', err));
     }
 
     // Set the session cookie

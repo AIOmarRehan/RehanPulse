@@ -1,17 +1,20 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { useState, useEffect, useCallback } from 'react';
 import { WidgetGrid, type WidgetConfig } from '@/components/widgets/widget-grid';
 import { useGitHubData } from '@/hooks/use-github-data';
+import { useVercelData } from '@/hooks/use-vercel-data';
 import { useEventStore } from '@/lib/stores/event-store';
 import type { GitHubCommit, GitHubPR, RateLimitInfo } from '@/lib/github';
+import type { VercelDeployment, VercelProject } from '@/lib/vercel';
 
 const fadeIn = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } };
 
 /* ─── Widget definitions for Dashboard ─── */
 const DASHBOARD_WIDGETS: WidgetConfig[] = [
   { id: 'commits', title: 'Recent Commits', icon: '🐙', colSpan: 1 },
-  { id: 'deploys', title: 'Active Deployments', icon: '🚀', colSpan: 1 },
+  { id: 'deploys', title: 'Deployments & Live Projects', icon: '🚀', colSpan: 2 },
   { id: 'prs', title: 'Pull Requests', icon: '📋', colSpan: 1 },
   { id: 'rate-limit', title: 'API Rate Limit', icon: '⚡', colSpan: 1 },
   { id: 'activity', title: 'Activity Timeline', icon: '📈', colSpan: 2 },
@@ -103,20 +106,201 @@ function RateLimitWidget({ rateLimit }: { rateLimit: RateLimitInfo | undefined }
   );
 }
 
+function DeploymentsWidget({ deployments, projects, isLoading, error }: { deployments: VercelDeployment[]; projects: VercelProject[]; isLoading: boolean; error: Error | null }) {
+  if (isLoading) return <WidgetSkeleton />;
+  if (error) {
+    const isNoToken = error.message.includes('No Vercel token') || error.message.includes('Vercel API failed');
+    return (
+      <p className="text-xs text-gray-400 dark:text-white/30">
+        {isNoToken ? 'Add your Vercel token in Settings to see deployments.' : error.message}
+      </p>
+    );
+  }
+
+  const stateColors: Record<string, string> = {
+    READY: 'bg-emerald-400',
+    BUILDING: 'bg-yellow-400 animate-pulse',
+    INITIALIZING: 'bg-yellow-400 animate-pulse',
+    QUEUED: 'bg-blue-400 animate-pulse',
+    ERROR: 'bg-red-400',
+    CANCELED: 'bg-gray-400',
+  };
+
+  const stateLabels: Record<string, string> = {
+    READY: 'Ready',
+    BUILDING: 'Building',
+    INITIALIZING: 'Initializing',
+    QUEUED: 'Queued',
+    ERROR: 'Error',
+    CANCELED: 'Canceled',
+  };
+
+  const ago = (ms: number) => {
+    const diff = Date.now() - ms;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  };
+
+  return (
+    <div className="grid grid-cols-2 gap-4 h-full">
+      {/* Left — Recent Deployments */}
+      <div className="flex flex-col min-h-0">
+        <h4 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-white/30">
+          Recent Deployments
+        </h4>
+        <div className="flex-1 overflow-y-auto space-y-1.5 max-h-48 pr-1 scrollbar-thin">
+          {deployments.length === 0 ? (
+            <p className="text-xs text-gray-400 dark:text-white/30">No deployments found</p>
+          ) : (
+            deployments.slice(0, 8).map((d) => (
+              <a
+                key={d.uid}
+                href={`https://${d.url}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600 transition-colors hover:bg-gray-100 dark:bg-white/[0.03] dark:text-white/60 dark:hover:bg-white/[0.06]"
+              >
+                <div className={`h-1.5 w-1.5 shrink-0 rounded-full ${stateColors[d.state] ?? 'bg-gray-400'}`} />
+                <span className="truncate font-medium">{d.name}</span>
+                <span className="ml-auto shrink-0 text-[10px] text-gray-400 dark:text-white/25">
+                  {d.target === 'production' ? '🔵 Prod' : '🟡 Preview'}
+                </span>
+                <span className="shrink-0 text-[10px] text-gray-400 dark:text-white/25">
+                  {stateLabels[d.state] ?? d.state} · {ago(d.createdAt)}
+                </span>
+              </a>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Right — Live Projects */}
+      <div className="flex flex-col min-h-0">
+        <h4 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-white/30">
+          Live Projects
+        </h4>
+        <div className="flex-1 overflow-y-auto space-y-1.5 max-h-48 pr-1 scrollbar-thin">
+          {projects.length === 0 ? (
+            <p className="text-xs text-gray-400 dark:text-white/30">No projects found</p>
+          ) : (
+            projects.map((p) => {
+              const prodUrl = p.targets?.production?.url;
+              return (
+                <div
+                  key={p.id}
+                  className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:bg-white/[0.03] dark:text-white/60"
+                >
+                  <div className={`h-1.5 w-1.5 shrink-0 rounded-full ${p.latestDeploymentState === 'READY' ? 'bg-emerald-400' : 'bg-yellow-400 animate-pulse'}`} />
+                  <div className="flex-1 min-w-0">
+                    <span className="block truncate font-medium">{p.name}</span>
+                    {prodUrl && (
+                      <a
+                        href={`https://${prodUrl}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block truncate text-[10px] text-indigo-400 hover:underline"
+                      >
+                        {prodUrl}
+                      </a>
+                    )}
+                  </div>
+                  <span className="shrink-0 text-[10px] text-gray-400 dark:text-white/25">
+                    {p.framework ?? 'Unknown'}
+                  </span>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ActivityTimeline({ commits }: { commits: GitHubCommit[] }) {
+  // Aggregate commits by day of week (Mon=0 ... Sun=6)
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const counts = [0, 0, 0, 0, 0, 0, 0];
+
+  for (const c of commits) {
+    const d = new Date(c.date);
+    // JS getDay: 0=Sun, 1=Mon ... 6=Sat -> remap to Mon=0 ... Sun=6
+    const idx = (d.getDay() + 6) % 7;
+    counts[idx]!++;
+  }
+
+  const max = Math.max(...counts, 1); // avoid div by 0
+
+  return (
+    <div>
+      <div className="flex h-28 items-end justify-between gap-2">
+        {counts.map((count, i) => {
+          const pct = Math.max((count / max) * 100, 4); // min 4% so bars are visible
+          return (
+            <motion.div
+              key={i}
+              initial={{ height: 0 }}
+              animate={{ height: `${pct}%` }}
+              transition={{ delay: 0.2 + i * 0.05, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+              className="group relative flex-1 rounded-t-md bg-gradient-to-t from-indigo-500/40 to-indigo-400/20"
+            >
+              <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] font-medium text-gray-400 opacity-0 transition-opacity group-hover:opacity-100 dark:text-white/40">
+                {count}
+              </span>
+            </motion.div>
+          );
+        })}
+      </div>
+      <div className="mt-2 flex justify-between text-[10px] text-gray-300 dark:text-white/20">
+        {days.map((d) => (
+          <span key={d}>{d}</span>
+        ))}
+      </div>
+      <p className="mt-2 text-center text-[10px] text-gray-400 dark:text-white/25">
+        {commits.length} commits this cycle
+      </p>
+    </div>
+  );
+}
+
 function LiveEventsWidget() {
   const events = useEventStore((s) => s.events);
-  const connected = useEventStore((s) => s.connected);
+  const connectionStatus = useEventStore((s) => s.connectionStatus);
+
+  const statusDot = connectionStatus === 'connected'
+    ? 'bg-emerald-400 animate-pulse'
+    : connectionStatus === 'connecting'
+      ? 'bg-yellow-400 animate-pulse'
+      : 'bg-gray-400';
+
+  const statusLabel = connectionStatus === 'connected'
+    ? 'Connected'
+    : connectionStatus === 'connecting'
+      ? 'Connecting...'
+      : 'Disconnected';
 
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-[10px]">
-        <span className={`h-1.5 w-1.5 rounded-full ${connected ? 'bg-emerald-400 animate-pulse' : 'bg-gray-400'}`} />
-        <span className="text-gray-400 dark:text-white/30">{connected ? 'Connected' : 'Disconnected'}</span>
+        <span className={`h-1.5 w-1.5 rounded-full ${statusDot}`} />
+        <span className="text-gray-400 dark:text-white/30">{statusLabel}</span>
       </div>
       {events.length === 0 ? (
-        <p className="text-xs text-gray-400 dark:text-white/30">
-          Waiting for webhook events...
-        </p>
+        <div className="space-y-2">
+          <p className="text-xs text-gray-400 dark:text-white/30">
+            No webhook events received yet.
+          </p>
+          <p className="text-[10px] text-gray-400/70 dark:text-white/20">
+            Go to <strong className="text-gray-500 dark:text-white/35">Settings</strong> and click{' '}
+            <strong className="text-gray-500 dark:text-white/35">Register Webhooks</strong> to start
+            receiving real-time events from your GitHub repos. Your app must be publicly accessible
+            (not localhost) for GitHub to deliver webhooks.
+          </p>
+        </div>
       ) : (
         events.slice(0, 6).map((ev) => (
           <div
@@ -143,6 +327,7 @@ function LiveEventsWidget() {
 /* ─── Dashboard ─── */
 export function DashboardContent({ userName }: { userName?: string }) {
   const { data, isLoading } = useGitHubData();
+  const { data: vercelData, isLoading: vercelLoading, error: vercelError } = useVercelData();
 
   const renderWidget = (widget: WidgetConfig) => {
     if (widget.id === 'commits') {
@@ -158,41 +343,11 @@ export function DashboardContent({ userName }: { userName?: string }) {
       return <RateLimitWidget rateLimit={data?.rateLimit} />;
     }
     if (widget.id === 'deploys') {
-      return (
-        <div className="space-y-2">
-          {['Production — Ready', 'Preview (pr-12) — Building', 'Preview (pr-11) — Ready'].map((item) => (
-            <div
-              key={item}
-              className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:bg-white/[0.03] dark:text-white/60"
-            >
-              <div className="h-1.5 w-1.5 rounded-full bg-indigo-400/60" />
-              {item}
-            </div>
-          ))}
-        </div>
-      );
+      return <DeploymentsWidget deployments={vercelData?.deployments ?? []} projects={vercelData?.projects ?? []} isLoading={vercelLoading} error={vercelError as Error | null} />;
     }
     if (widget.id === 'activity') {
-      return (
-        <div>
-          <div className="flex h-28 items-end justify-between gap-2">
-            {[40, 65, 45, 80, 55, 90, 70].map((h, i) => (
-              <motion.div
-                key={i}
-                initial={{ height: 0 }}
-                animate={{ height: `${h}%` }}
-                transition={{ delay: 0.2 + i * 0.05, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-                className="flex-1 rounded-t-md bg-gradient-to-t from-indigo-500/40 to-indigo-400/20"
-              />
-            ))}
-          </div>
-          <div className="mt-2 flex justify-between text-[10px] text-gray-300 dark:text-white/20">
-            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
-              <span key={d}>{d}</span>
-            ))}
-          </div>
-        </div>
-      );
+      if (isLoading) return <WidgetSkeleton />;
+      return <ActivityTimeline commits={data?.commits ?? []} />;
     }
     if (widget.id === 'live-events') {
       return <LiveEventsWidget />;
@@ -688,5 +843,303 @@ export function AlertsContent() {
         </div>
       </motion.div>
     </>
+  );
+}
+
+/* ─── Settings ─── */
+interface UserSettings {
+  hasVercelToken: boolean;
+  hasGitHubToken: boolean;
+  webhooksRegistered: boolean;
+}
+
+export function SettingsContent() {
+  const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [vercelToken, setVercelToken] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [registeringWebhooks, setRegisteringWebhooks] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const loadSettings = useCallback(async () => {
+    try {
+      const res = await fetch('/api/settings');
+      if (res.ok) {
+        setSettings(await res.json() as UserSettings);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadSettings(); }, [loadSettings]);
+
+  const saveVercelToken = async () => {
+    if (!vercelToken.trim()) return;
+    setSaving(true);
+    setMessage(null);
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vercelToken: vercelToken.trim() }),
+      });
+      const data = await res.json() as { error?: string };
+      if (!res.ok) {
+        setMessage({ type: 'error', text: data.error ?? 'Failed to save' });
+      } else {
+        setMessage({ type: 'success', text: 'Vercel token saved and verified!' });
+        setVercelToken('');
+        loadSettings();
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Network error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeVercelToken = async () => {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ removeVercelToken: true }),
+      });
+      if (res.ok) {
+        setMessage({ type: 'success', text: 'Vercel token removed' });
+        loadSettings();
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Network error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRegisterWebhooks = async () => {
+    setRegisteringWebhooks(true);
+    setMessage(null);
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ registerWebhooks: true }),
+      });
+      const data = await res.json() as { error?: string; registered?: number; skipped?: number; errors?: number; errorDetails?: string[]; isLocalhost?: boolean };
+      if (!res.ok) {
+        setMessage({ type: 'error', text: data.error ?? 'Failed to register webhooks' });
+      } else if (data.isLocalhost) {
+        setMessage({
+          type: 'error',
+          text: data.errorDetails?.[0] ?? 'Cannot register webhooks on localhost. Deploy your app first.',
+        });
+      } else if (data.errors && data.errors > 0 && data.registered === 0 && data.skipped === 0) {
+        const detail = data.errorDetails?.length ? `\n${data.errorDetails.join('\n')}` : '';
+        setMessage({
+          type: 'error',
+          text: `All ${data.errors} repos failed webhook registration.${detail}`,
+        });
+      } else {
+        const stats = { registered: data.registered ?? 0, skipped: data.skipped ?? 0, errors: data.errors ?? 0 };
+        setMessage({
+          type: 'success',
+          text: `Webhooks registered on ${stats.registered} repos (${stats.skipped} already had webhooks${stats.errors > 0 ? `, ${stats.errors} errors` : ''})`,
+        });
+        loadSettings();
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Network error' });
+    } finally {
+      setRegisteringWebhooks(false);
+    }
+  };
+
+  return (
+    <>
+      <motion.div {...fadeIn} transition={{ duration: 0.4 }} className="mb-8">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Settings</h2>
+        <p className="mt-1 text-sm text-gray-500 dark:text-white/40">
+          Manage your integrations and API tokens.
+        </p>
+      </motion.div>
+
+      {message && (
+        <motion.div
+          {...fadeIn}
+          className={`mb-6 rounded-xl border p-4 text-sm ${
+            message.type === 'success'
+              ? 'border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-400'
+              : 'border-red-500/20 bg-red-500/[0.06] text-red-400'
+          }`}
+        >
+          {message.text}
+        </motion.div>
+      )}
+
+      {/* Integration Status */}
+      <motion.div {...fadeIn} transition={{ delay: 0.1 }} className="mb-6">
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-white/30">
+          Integration Status
+        </h3>
+        <div className="space-y-2">
+          {loading ? (
+            <div className="space-y-2 animate-pulse">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-14 rounded-xl border border-gray-200 bg-gray-100 dark:border-white/[0.06] dark:bg-white/[0.03]" />
+              ))}
+            </div>
+          ) : (
+            <>
+              <IntegrationRow
+                icon="🐙"
+                name="GitHub"
+                description="OAuth connected — repos, commits, and PRs are synced automatically"
+                connected={!!settings?.hasGitHubToken}
+              />
+              <IntegrationRow
+                icon="📡"
+                name="GitHub Webhooks"
+                description={settings?.webhooksRegistered
+                  ? 'Webhooks active — receiving real-time events from your repos'
+                  : 'Not registered yet — click the button to register on all your repos'}
+                connected={!!settings?.webhooksRegistered}
+              >
+                <button
+                  onClick={handleRegisterWebhooks}
+                  disabled={registeringWebhooks || !settings?.hasGitHubToken}
+                  className="shrink-0 rounded-lg bg-indigo-500/10 px-3 py-1.5 text-[11px] font-medium text-indigo-400 transition-colors hover:bg-indigo-500/20 disabled:opacity-50"
+                >
+                  {registeringWebhooks ? 'Registering...' : settings?.webhooksRegistered ? 'Re-register' : 'Register Webhooks'}
+                </button>
+              </IntegrationRow>
+              <IntegrationRow
+                icon="▲"
+                name="Vercel"
+                description={settings?.hasVercelToken ? 'Connected — deployments are synced' : 'Not configured — add your token below'}
+                connected={!!settings?.hasVercelToken}
+              />
+            </>
+          )}
+        </div>
+      </motion.div>
+
+      {/* Vercel Token */}
+      <motion.div
+        {...fadeIn}
+        transition={{ delay: 0.2 }}
+        className="rounded-xl border border-gray-200 dark:border-white/[0.06] bg-white dark:bg-white/[0.03] p-5"
+      >
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-lg">▲</span>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Vercel API Token</h3>
+        </div>
+        <p className="mb-4 text-xs text-gray-400 dark:text-white/30">
+          Your Vercel token is encrypted and stored securely. Generate one at{' '}
+          <a
+            href="https://vercel.com/account/tokens"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-indigo-400 hover:underline"
+          >
+            vercel.com/account/tokens
+          </a>
+          .
+        </p>
+
+        {settings?.hasVercelToken ? (
+          <div className="flex items-center gap-3">
+            <div className="flex-1 rounded-lg bg-gray-50 px-4 py-2.5 text-sm text-gray-500 dark:bg-white/[0.04] dark:text-white/40">
+              •••••••••••••••• <span className="text-emerald-400 text-xs ml-2">Connected</span>
+            </div>
+            <button
+              onClick={removeVercelToken}
+              disabled={saving}
+              className="shrink-0 rounded-lg bg-red-500/10 px-4 py-2.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50"
+            >
+              Remove
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <input
+              type="password"
+              value={vercelToken}
+              onChange={(e) => setVercelToken(e.target.value)}
+              placeholder="Enter your Vercel API token"
+              className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white dark:placeholder:text-white/20"
+            />
+            <button
+              onClick={saveVercelToken}
+              disabled={saving || !vercelToken.trim()}
+              className="shrink-0 rounded-lg bg-indigo-500 px-4 py-2.5 text-xs font-medium text-white transition-colors hover:bg-indigo-600 disabled:opacity-50"
+            >
+              {saving ? 'Verifying...' : 'Save'}
+            </button>
+          </div>
+        )}
+      </motion.div>
+
+      {/* Info */}
+      <motion.div {...fadeIn} transition={{ delay: 0.3 }} className="mt-6">
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-white/30">
+          How It Works
+        </h3>
+        <div className="space-y-3 text-xs text-gray-400 dark:text-white/30">
+          <p>
+            <strong className="text-gray-600 dark:text-white/50">GitHub:</strong>{' '}
+            Automatically connected via OAuth when you sign in. Your access token is encrypted (AES-256-GCM)
+            and stored in Firestore. Webhooks are auto-registered on all your repos.
+          </p>
+          <p>
+            <strong className="text-gray-600 dark:text-white/50">Vercel:</strong>{' '}
+            Enter your personal API token above. It&apos;s validated, encrypted, and stored per-user.
+            Your deployments will appear on the Dashboard and Deployments page automatically.
+          </p>
+          <p>
+            <strong className="text-gray-600 dark:text-white/50">Live Events:</strong>{' '}
+            GitHub webhooks stream to your dashboard in real-time via SSE. Events appear as they happen
+            on any of your connected repos.
+          </p>
+        </div>
+      </motion.div>
+    </>
+  );
+}
+
+function IntegrationRow({
+  icon,
+  name,
+  description,
+  connected,
+  children,
+}: {
+  icon: string;
+  name: string;
+  description: string;
+  connected: boolean;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-gray-200 dark:border-white/[0.06] bg-gray-50 dark:bg-white/[0.02] p-4">
+      <span className="text-lg">{icon}</span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-900 dark:text-white">{name}</span>
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${connected ? 'bg-emerald-400' : 'bg-gray-300 dark:bg-white/15'}`}
+          />
+        </div>
+        <p className="mt-0.5 truncate text-[11px] text-gray-400 dark:text-white/30">{description}</p>
+      </div>
+      {children}
+      <span className={`text-xs font-medium ${connected ? 'text-emerald-400' : 'text-gray-400 dark:text-white/25'}`}>
+        {connected ? 'Active' : 'Inactive'}
+      </span>
+    </div>
   );
 }

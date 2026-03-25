@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Command } from 'cmdk';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export interface SpotlightAction {
   id: string;
   label: string;
-  icon: string;
+  icon: React.ReactNode;
   keywords?: string;
   onSelect: () => void;
   group: string;
@@ -91,7 +91,7 @@ export function CommandPalette({
               <div className="flex items-center gap-3 border-b border-white/[0.18] px-4 dark:border-white/[0.08]">
                 <svg
                   viewBox="0 0 24 24"
-                  className="h-4 w-4 shrink-0 text-gray-400 dark:text-white/30"
+                  className="h-4 w-4 shrink-0 text-black dark:text-white/30"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth={2}
@@ -105,7 +105,7 @@ export function CommandPalette({
                   value={search}
                   onValueChange={setSearch}
                   placeholder="Type a command or search..."
-                  className="flex-1 border-0 bg-transparent py-3.5 text-sm text-gray-900 outline-none placeholder:text-gray-400 dark:text-white dark:placeholder:text-white/30"
+                  className="flex-1 border-0 bg-transparent py-3.5 text-sm text-gray-900 outline-none placeholder:text-black/50 dark:text-white dark:placeholder:text-white/30"
                 />
                 <kbd className="hidden rounded-md border border-white/[0.18] bg-white/60 px-1.5 py-0.5 text-[10px] font-medium text-gray-400 dark:border-white/[0.10] dark:bg-white/[0.06] dark:text-white/30 sm:inline-block">
                   ESC
@@ -131,7 +131,7 @@ export function CommandPalette({
                         onSelect={() => handleSelect(action)}
                         className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-gray-700 transition-colors data-[selected=true]:bg-white/60 data-[selected=true]:text-gray-900 dark:text-white/60 dark:data-[selected=true]:bg-white/[0.10] dark:data-[selected=true]:text-white"
                       >
-                        <span className="text-base">{action.icon}</span>
+                        <span className="flex h-5 w-5 items-center justify-center text-gray-500 dark:text-white/40">{action.icon}</span>
                         <span className="flex-1">{action.label}</span>
                       </Command.Item>
                     ))}

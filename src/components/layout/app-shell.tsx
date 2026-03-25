@@ -81,7 +81,7 @@ export function AppShell() {
     ...NAV_ITEMS.map((item) => ({
       id: `nav-${item.id}`,
       label: item.label,
-      icon: item.label.charAt(0),
+      icon: <img src={item.lightIcon} alt={item.label} width={16} height={16} className="h-4 w-4" />,
       group: 'Navigation',
       keywords: item.label.toLowerCase(),
       onSelect: () => setActiveNav(item.id),
@@ -90,7 +90,11 @@ export function AppShell() {
     {
       id: 'toggle-theme',
       label: theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode',
-      icon: theme === 'dark' ? '☀️' : '🌙',
+      icon: theme === 'dark' ? (
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></svg>
+      ) : (
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
+      ),
       group: 'Actions',
       keywords: 'theme dark light mode toggle',
       onSelect: () => setTheme(theme === 'dark' ? 'light' : 'dark'),
@@ -98,7 +102,7 @@ export function AppShell() {
     {
       id: 'toggle-sidebar',
       label: sidebarOpen ? 'Collapse Sidebar' : 'Expand Sidebar',
-      icon: '📐',
+      icon: <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="9" y1="3" x2="9" y2="21" /></svg>,
       group: 'Actions',
       keywords: 'sidebar panel toggle',
       onSelect: () => setSidebarOpen((o) => !o),
@@ -106,7 +110,7 @@ export function AppShell() {
     {
       id: 'sign-out',
       label: 'Sign Out',
-      icon: '🚪',
+      icon: <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>,
       group: 'Account',
       keywords: 'logout sign out exit',
       onSelect: signOut,
@@ -260,7 +264,7 @@ export function AppShell() {
             <button
               onClick={() => setCmdOpen(true)}
               aria-label="Open command palette"
-              className="ml-2 flex h-7 items-center gap-2 rounded-lg border border-white/[0.85] bg-white/40 backdrop-blur-sm px-2.5 text-xs text-gray-400 transition-colors hover:bg-white/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] dark:border-white/[0.08] dark:bg-[#0c0c1d]/60 dark:text-white/25 dark:hover:bg-white/[0.08] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+              className="ml-2 flex h-7 items-center gap-2 rounded-lg border border-white/[0.85] bg-white/40 backdrop-blur-sm px-2.5 text-xs text-black/60 transition-colors hover:bg-white/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] dark:border-white/[0.08] dark:bg-[#0c0c1d]/60 dark:text-white/25 dark:hover:bg-white/[0.08] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
             >
               <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="8" />
@@ -327,9 +331,9 @@ export function AppShell() {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -4, scale: 0.95 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-9 z-[60] w-80 overflow-hidden rounded-xl border border-white/[0.85] bg-white/40 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:border-white/[0.08] dark:bg-[#0c0c1d]/60 dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)]"
+                    className="absolute right-0 top-9 z-[60] w-80 overflow-hidden rounded-xl border border-white/[0.85] bg-white/60 backdrop-blur-2xl backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.15),inset_0_1px_0_rgba(255,255,255,0.9)] dark:border-white/[0.08] dark:bg-[#0c0c1d]/70 dark:shadow-[0_8px_32px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.12)] [isolation:isolate]"
                   >
-                    <div className="flex items-center justify-between border-b border-gray-200/60 dark:border-white/[0.08] bg-gray-50/80 dark:bg-white/[0.03] px-4 py-2.5">
+                    <div className="flex items-center justify-between border-b border-white/[0.3] dark:border-white/[0.08] bg-white/30 backdrop-blur-xl dark:bg-white/[0.03] px-4 py-2.5">
                       <span className="text-xs font-semibold text-gray-900 dark:text-white">Notifications</span>
                       {unreadCount > 0 && (
                         <button
@@ -369,7 +373,7 @@ export function AppShell() {
                       )}
                     </div>
                     {notifications.length > 0 && (
-                      <div className="border-t border-gray-200/60 dark:border-white/[0.08] bg-gray-50/80 dark:bg-white/[0.03] px-4 py-2 flex items-center justify-between">
+                      <div className="border-t border-white/[0.3] dark:border-white/[0.08] bg-white/30 backdrop-blur-xl dark:bg-white/[0.03] px-4 py-2 flex items-center justify-between">
                         <button
                           onClick={() => { setNotifOpen(false); setActiveNav('alerts'); }}
                           className="text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors"

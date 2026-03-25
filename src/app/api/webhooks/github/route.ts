@@ -25,6 +25,7 @@ function classifyEvent(eventType: string, action?: string): string {
       return action === 'opened' ? 'pr_opened' : action === 'closed' ? 'pr_closed' : 'pr_updated';
     case 'check_run':
     case 'check_suite':
+    case 'workflow_run':
       return 'ci';
     case 'deployment':
     case 'deployment_status':

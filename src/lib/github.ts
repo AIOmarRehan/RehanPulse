@@ -243,7 +243,7 @@ export async function registerWebhooksForUser(
           content_type: 'json',
           secret: webhookSecret,
         },
-        events: ['push', 'pull_request', 'deployment', 'workflow_run', 'issues', 'star'],
+        events: ['push', 'pull_request', 'check_run', 'deployment', 'workflow_run', 'issues', 'star'],
         active: true,
       });
       stats.registered++;

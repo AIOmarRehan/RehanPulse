@@ -1,12 +1,24 @@
-import type { Metadata } from 'next';
+'use client';
 
-export const metadata: Metadata = {
-  title: 'Terms of Service — RehanPulse',
-};
+import { useAuth } from '@/components/providers/auth-provider';
+import { useRouter } from 'next/navigation';
 
 export default function TermsOfServicePage() {
+  const { user } = useAuth();
+  const router = useRouter();
+
   return (
     <main className="mx-auto max-w-3xl px-6 py-16 text-gray-800 dark:text-gray-200">
+      <title>Terms of Service — RehanPulse</title>
+      <button
+        onClick={() => router.push(user ? '/' : '/home')}
+        className="mb-8 inline-flex items-center gap-1.5 rounded-lg border border-white/[0.85] dark:border-white/[0.12] bg-white/55 dark:bg-[#0c0c1d]/80 backdrop-blur-[28px] px-4 py-2 text-xs font-medium text-gray-600 dark:text-white/60 transition-all hover:bg-white/80 dark:hover:bg-white/[0.12]"
+      >
+        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="15 18 9 12 15 6" />
+        </svg>
+        {user ? 'Return to Dashboard' : 'Return to Home'}
+      </button>
       <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
         Terms of Service
       </h1>

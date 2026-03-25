@@ -160,7 +160,18 @@ export function AppShell() {
                 >
                   <span className="text-base">{item.icon}</span>
                   <span className="font-medium">{item.label}</span>
-                  {activeNav === item.id && (
+                  {item.id === 'alerts' && unreadCount > 0 && (
+                    <span className="ml-auto flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                  {activeNav === item.id && item.id !== 'alerts' && (
+                    <motion.div
+                      layoutId="nav-indicator"
+                      className="ml-auto h-1.5 w-1.5 rounded-full bg-indigo-400"
+                    />
+                  )}
+                  {activeNav === item.id && item.id === 'alerts' && unreadCount === 0 && (
                     <motion.div
                       layoutId="nav-indicator"
                       className="ml-auto h-1.5 w-1.5 rounded-full bg-indigo-400"
@@ -192,6 +203,11 @@ export function AppShell() {
                     </p>
                   </div>
                 </div>
+                <div className="mt-1 flex gap-3 px-3 text-[10px] text-gray-400 dark:text-white/25">
+                  <a href="/policy" className="transition-colors hover:text-gray-600 dark:hover:text-white/50">Privacy</a>
+                  <a href="/terms" className="transition-colors hover:text-gray-600 dark:hover:text-white/50">Terms</a>
+                  <a href="/home" className="transition-colors hover:text-gray-600 dark:hover:text-white/50">Homepage</a>
+                </div>
               </div>
             )}
           </motion.aside>
@@ -201,7 +217,7 @@ export function AppShell() {
       {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top menubar */}
-        <header className="relative z-10 flex h-12 shrink-0 items-center justify-between border-b border-white/[0.18] dark:border-white/[0.08] bg-white/55 dark:bg-white/[0.04] px-4 backdrop-blur-[28px] backdrop-saturate-[180%]">
+        <header className="relative z-40 flex h-12 shrink-0 items-center justify-between border-b border-white/[0.18] dark:border-white/[0.08] bg-white/55 dark:bg-white/[0.04] px-4 backdrop-blur-[28px] backdrop-saturate-[180%]">
           <div className="flex items-center gap-3">
             {/* Sidebar toggle */}
             <button
@@ -303,9 +319,9 @@ export function AppShell() {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -4, scale: 0.95 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-9 z-50 w-80 overflow-hidden rounded-xl border border-white/[0.18] bg-white/90 shadow-xl backdrop-blur-xl dark:border-white/[0.08] dark:bg-[#0c0c1d]/95"
+                    className="absolute right-0 top-9 z-[60] w-80 overflow-hidden rounded-xl border border-white/[0.18] bg-white/95 shadow-2xl backdrop-blur-2xl dark:border-white/[0.10] dark:bg-[#0c0c1d] dark:shadow-[0_8px_40px_rgba(0,0,0,0.5)]"
                   >
-                    <div className="flex items-center justify-between border-b border-white/[0.18] dark:border-white/[0.08] px-4 py-2.5">
+                    <div className="flex items-center justify-between border-b border-gray-200/60 dark:border-white/[0.08] bg-gray-50/80 dark:bg-white/[0.03] px-4 py-2.5">
                       <span className="text-xs font-semibold text-gray-900 dark:text-white">Notifications</span>
                       {unreadCount > 0 && (
                         <button
@@ -316,7 +332,7 @@ export function AppShell() {
                         </button>
                       )}
                     </div>
-                    <div className="max-h-72 overflow-y-auto">
+                    <div className="max-h-72 overflow-y-auto overscroll-contain [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-white/10">
                       {notifications.length === 0 ? (
                         <div className="px-4 py-6 text-center text-xs text-gray-400 dark:text-white/30">
                           No notifications yet
@@ -345,7 +361,7 @@ export function AppShell() {
                       )}
                     </div>
                     {notifications.length > 0 && (
-                      <div className="border-t border-white/[0.18] dark:border-white/[0.08] px-4 py-2">
+                      <div className="border-t border-gray-200/60 dark:border-white/[0.08] bg-gray-50/80 dark:bg-white/[0.03] px-4 py-2">
                         <button
                           onClick={() => { setNotifOpen(false); setActiveNav('alerts'); }}
                           className="w-full text-center text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors"

@@ -20,10 +20,11 @@ export async function GET(request: NextRequest) {
 
     const limitParam = request.nextUrl.searchParams.get('limit');
     const limit = Math.min(Math.max(Number(limitParam) || 10, 1), 100);
+    const forceRefresh = request.nextUrl.searchParams.get('force') === '1';
 
     const cacheKey = `${decoded.uid}:${limit}`;
     const cached = cache.get(cacheKey);
-    if (cached && Date.now() - cached.ts < CACHE_TTL) {
+    if (!forceRefresh && cached && Date.now() - cached.ts < CACHE_TTL) {
       return NextResponse.json(cached.data, {
         headers: { 'Cache-Control': 'private, s-maxage=30, stale-while-revalidate=60' },
       });

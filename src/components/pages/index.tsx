@@ -491,8 +491,15 @@ function LiveEventsWidget() {
 
 /* ─── Dashboard ─── */
 export function DashboardContent({ userName }: { userName?: string }) {
-  const { data, isLoading } = useGitHubData();
+  const { data, isLoading, refresh } = useGitHubData();
   const { data: vercelData, isLoading: vercelLoading, error: vercelError } = useVercelData();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try { await refresh(); } catch { /* ignore */ }
+    finally { setRefreshing(false); }
+  };
 
   const renderWidget = (widget: WidgetConfig) => {
     if (widget.id === 'commits') {
@@ -529,12 +536,29 @@ export function DashboardContent({ userName }: { userName?: string }) {
   return (
     <>
       <motion.div {...fadeIn} transition={{ duration: 0.4 }} className="mb-6">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-          Welcome back{userName ? `, ${userName}` : ''}
-        </h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-white/40">
-          Here&apos;s your developer activity overview. Drag widgets to rearrange.
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              Welcome back{userName ? `, ${userName}` : ''}
+            </h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-white/40">
+              Here&apos;s your developer activity overview. Drag widgets to rearrange.
+            </p>
+          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            title="Sync latest data from GitHub & Vercel"
+            className="flex items-center gap-1.5 rounded-lg border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] px-3 py-2 text-xs font-medium text-gray-600 dark:text-white/50 transition-colors hover:bg-white/60 dark:hover:bg-white/[0.08] disabled:opacity-50"
+          >
+            <svg viewBox="0 0 24 24" className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10" />
+              <polyline points="1 20 1 14 7 14" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+            </svg>
+            {refreshing ? 'Syncing...' : 'Refresh'}
+          </button>
+        </div>
       </motion.div>
 
       <WidgetGrid widgets={DASHBOARD_WIDGETS} renderWidget={renderWidget} />
@@ -555,15 +579,39 @@ function WidgetSkeleton() {
 
 /* ─── GitHub Activity ─── */
 export function GitHubContent() {
-  const { data, isLoading, error } = useGitHubData();
+  const { data, isLoading, error, refresh } = useGitHubData();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try { await refresh(); } catch { /* ignore */ }
+    finally { setRefreshing(false); }
+  };
 
   return (
     <>
       <motion.div {...fadeIn} transition={{ duration: 0.4 }} className="mb-8">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">GitHub Activity</h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-white/40">
-          Your repositories, commits, and pull request activity.
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">GitHub Activity</h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-white/40">
+              Your repositories, commits, and pull request activity.
+            </p>
+          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            title="Sync latest data from GitHub"
+            className="flex items-center gap-1.5 rounded-lg border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] px-3 py-2 text-xs font-medium text-gray-600 dark:text-white/50 transition-colors hover:bg-white/60 dark:hover:bg-white/[0.08] disabled:opacity-50"
+          >
+            <svg viewBox="0 0 24 24" className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10" />
+              <polyline points="1 20 1 14 7 14" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+            </svg>
+            {refreshing ? 'Syncing...' : 'Refresh'}
+          </button>
+        </div>
       </motion.div>
 
       {error && (
@@ -1639,7 +1687,9 @@ export function SettingsContent() {
   const [vercelToken, setVercelToken] = useState('');
   const [saving, setSaving] = useState(false);
   const [registeringWebhooks, setRegisteringWebhooks] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const { refresh: refreshGitHub } = useGitHubData();
 
   const loadSettings = useCallback(async () => {
     try {
@@ -1780,7 +1830,23 @@ export function SettingsContent() {
                 name="GitHub"
                 description="OAuth connected — repos, commits, and PRs are synced automatically"
                 connected={!!settings?.hasGitHubToken}
-              />
+              >
+                <button
+                  onClick={async () => {
+                    setSyncing(true);
+                    setMessage(null);
+                    try {
+                      await refreshGitHub();
+                      setMessage({ type: 'success', text: 'GitHub data synced — stale repos and PRs have been refreshed.' });
+                    } catch { setMessage({ type: 'error', text: 'Failed to sync GitHub data.' }); }
+                    finally { setSyncing(false); }
+                  }}
+                  disabled={syncing || !settings?.hasGitHubToken}
+                  className="shrink-0 rounded-lg bg-indigo-500/10 px-3 py-1.5 text-[11px] font-medium text-indigo-400 transition-colors hover:bg-indigo-500/20 disabled:opacity-50"
+                >
+                  {syncing ? 'Syncing...' : 'Sync Now'}
+                </button>
+              </IntegrationRow>
               <IntegrationRow
                 icon={<ThemeIcon dark="/macos-icons/live-events.png" light="/macos-icons/live-events.png" alt="Webhooks" size={20} />}
                 name="GitHub Webhooks"

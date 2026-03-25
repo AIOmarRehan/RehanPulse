@@ -25,8 +25,10 @@ export async function GET(request: NextRequest) {
     const decoded = await adminAuth.verifySessionCookie(session, true);
     const uid = decoded.uid;
 
+    const forceRefresh = request.nextUrl.searchParams.get('force') === '1';
+
     const cached = cache.get(uid);
-    if (cached && Date.now() - cached.ts < CACHE_TTL) {
+    if (!forceRefresh && cached && Date.now() - cached.ts < CACHE_TTL) {
       return NextResponse.json(cached.data, {
         headers: { 'Cache-Control': 'private, s-maxage=60, stale-while-revalidate=120' },
       });

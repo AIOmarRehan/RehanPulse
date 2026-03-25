@@ -52,6 +52,21 @@ export async function POST(request: NextRequest) {
     }
 
     const db = getAdminDb();
+
+    // Check for duplicate rule (same eventType for this user)
+    const existing = await db.collection('alert_rules')
+      .where('uid', '==', user.uid)
+      .where('eventType', '==', eventType)
+      .limit(1)
+      .get();
+
+    if (!existing.empty) {
+      return NextResponse.json(
+        { error: `An alert rule for this event type already exists` },
+        { status: 409 }
+      );
+    }
+
     const doc = await db.collection('alert_rules').add({
       uid: user.uid,
       name,
@@ -98,6 +113,40 @@ export async function PATCH(request: NextRequest) {
   } catch (error) {
     console.error('Alerts PATCH error:', error);
     return NextResponse.json({ error: 'Failed to update rule' }, { status: 500 });
+  }
+}
+
+/** PUT /api/alerts — rename an alert rule */
+export async function PUT(request: NextRequest) {
+  try {
+    const session = request.cookies.get('__session')?.value;
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const user = await getAdminAuth().verifySessionCookie(session, true);
+    const body = (await request.json()) as Record<string, unknown>;
+
+    const id = typeof body.id === 'string' ? body.id : '';
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+
+    if (!id || !name) {
+      return NextResponse.json({ error: 'id and name are required' }, { status: 400 });
+    }
+
+    const db = getAdminDb();
+    const docRef = db.collection('alert_rules').doc(id);
+    const docSnap = await docRef.get();
+
+    if (!docSnap.exists || (docSnap.data() as Record<string, unknown>).uid !== user.uid) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    await docRef.update({ name });
+    return NextResponse.json({ id, name });
+  } catch (error) {
+    console.error('Alerts PUT error:', error);
+    return NextResponse.json({ error: 'Failed to rename rule' }, { status: 500 });
   }
 }
 

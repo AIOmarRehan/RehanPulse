@@ -4,6 +4,10 @@ import { fetchDeployments, fetchProjects, fetchUsage } from '@/lib/vercel';
 
 export const revalidate = 60;
 
+/* Simple in-memory cache: avoids re-calling slow Vercel APIs on every request */
+const cache = new Map<string, { data: unknown; ts: number }>();
+const CACHE_TTL = 2 * 60_000; // 2 minutes
+
 export async function GET(request: NextRequest) {
   try {
     const session = request.cookies.get('__session')?.value;
@@ -17,14 +21,25 @@ export async function GET(request: NextRequest) {
     const limitParam = request.nextUrl.searchParams.get('limit');
     const limit = Math.min(Math.max(Number(limitParam) || 10, 1), 100);
 
+    const cacheKey = `${decoded.uid}:${limit}`;
+    const cached = cache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < CACHE_TTL) {
+      return NextResponse.json(cached.data, {
+        headers: { 'Cache-Control': 'private, s-maxage=30, stale-while-revalidate=60' },
+      });
+    }
+
     const [deployments, projects, usage] = await Promise.all([
       fetchDeployments(decoded.uid, limit),
       fetchProjects(decoded.uid),
       fetchUsage(decoded.uid).catch(() => null),
     ]);
 
+    const payload = { deployments, projects, usage };
+    cache.set(cacheKey, { data: payload, ts: Date.now() });
+
     return NextResponse.json(
-      { deployments, projects, usage },
+      payload,
       {
         headers: {
           'Cache-Control': 'private, s-maxage=30, stale-while-revalidate=60',

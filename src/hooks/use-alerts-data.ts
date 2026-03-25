@@ -77,7 +77,24 @@ export function useAlertRules() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(rule),
       });
+      if (res.status === 409) {
+        const data = await res.json() as { error: string };
+        throw new Error(data.error ?? 'Duplicate rule');
+      }
       if (!res.ok) throw new Error('Failed to create rule');
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['alert-rules'] }),
+  });
+
+  const renameRule = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const res = await fetch('/api/alerts', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, name }),
+      });
+      if (!res.ok) throw new Error('Failed to rename rule');
       return res.json();
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['alert-rules'] }),
@@ -92,7 +109,7 @@ export function useAlertRules() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['alert-rules'] }),
   });
 
-  return { ...query, toggleRule, createRule, deleteRule };
+  return { ...query, toggleRule, createRule, renameRule, deleteRule };
 }
 
 export function useNotifications() {
@@ -131,7 +148,16 @@ export function useNotifications() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
   });
 
+  const clearAll = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/notifications', { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to clear notifications');
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+
   const unreadCount = (query.data?.notifications ?? []).filter((n) => !n.read).length;
 
-  return { ...query, markRead, markAllRead, unreadCount };
+  return { ...query, markRead, markAllRead, clearAll, unreadCount };
 }

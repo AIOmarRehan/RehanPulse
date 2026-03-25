@@ -26,7 +26,8 @@ export function useVercelData(limit?: number) {
   return useQuery({
     queryKey: ['vercel-data', limit ?? 10],
     queryFn: () => fetchVercelData(limit),
-    staleTime: 30_000,
-    refetchInterval: 60_000,
+    staleTime: 5 * 60_000,
+    refetchInterval: 10 * 60_000,
+    retry: 1,
   });
 }

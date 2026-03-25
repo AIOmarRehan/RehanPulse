@@ -5,6 +5,7 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { motion } from 'framer-motion';
+import Image from 'next/image';
 import dynamic from 'next/dynamic';
 
 const AnimatedBackground = dynamic(
@@ -14,7 +15,7 @@ const AnimatedBackground = dynamic(
 
 function MacOSSpinner() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f0f4ff] dark:bg-[#050608]">
+    <div className="flex min-h-screen items-center justify-center bg-[#f5f5f7] dark:bg-[#050608]">
       <div className="relative h-8 w-8">
         {Array.from({ length: 12 }).map((_, i) => (
           <div
@@ -98,14 +99,14 @@ function LoginContent() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#f0f4ff] dark:bg-[#050608]">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#f5f5f7] dark:bg-[#050608]">
       {mounted && <AnimatedBackground />}
 
       {/* Back to home link */}
       {mounted && (
         <a
           href="/home"
-          className="absolute left-6 top-6 z-20 flex items-center gap-2 rounded-full border border-white/[0.85] dark:border-white/[0.12] bg-white/55 dark:bg-[#0c0c1d]/80 backdrop-blur-[28px] px-4 py-2 text-xs font-medium text-gray-600 dark:text-white/60 shadow-[0_4px_20px_rgba(100,120,200,0.08)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.2)] transition-all hover:bg-white/80 dark:hover:bg-white/[0.12] hover:text-gray-900 dark:hover:text-white/90"
+          className="absolute left-6 top-6 z-20 flex items-center gap-2 rounded-full border border-white/[0.85] dark:border-white/[0.12] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] px-4 py-2 text-xs font-medium text-black dark:text-white/60 shadow-[0_4px_20px_rgba(100,120,200,0.08)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.2)] transition-all hover:bg-white/80 dark:hover:bg-white/[0.12] hover:text-black dark:hover:text-white/90"
         >
           <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
             <line x1="19" y1="12" x2="5" y2="12" />
@@ -119,7 +120,7 @@ function LoginContent() {
       {mounted && (
         <button
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          className="absolute right-6 top-6 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.85] dark:border-white/[0.12] bg-white/55 dark:bg-[#0c0c1d]/80 text-gray-500 dark:text-white/50 backdrop-blur-[28px] shadow-[0_4px_20px_rgba(100,120,200,0.08)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.2)] transition-all hover:bg-white/80 dark:hover:bg-white/[0.12] hover:text-gray-700 dark:hover:text-white/80"
+          className="absolute right-6 top-6 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.85] dark:border-white/[0.12] bg-white/40 dark:bg-[#0c0c1d]/60 text-black dark:text-white/50 backdrop-blur-[28px] shadow-[0_4px_20px_rgba(100,120,200,0.08)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.2)] transition-all hover:bg-white/80 dark:hover:bg-white/[0.12] hover:text-black dark:hover:text-white/80"
           aria-label="Toggle theme"
         >
           {theme === 'dark' ? (
@@ -155,13 +156,13 @@ function LoginContent() {
         className="relative z-10 w-full max-w-md px-6"
       >
         {/* macOS window chrome */}
-        <div className="overflow-hidden rounded-2xl border border-white/[0.85] dark:border-white/[0.12] bg-white/55 dark:bg-[#0c0c1d]/80 shadow-[0_8px_32px_rgba(100,120,200,0.14),inset_0_1px_0_rgba(255,255,255,0.95)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-[28px] backdrop-saturate-[180%]">
+        <div className="overflow-hidden rounded-2xl border border-white/[0.85] dark:border-white/[0.12] bg-white/40 dark:bg-[#0c0c1d]/60 shadow-[0_8px_32px_rgba(100,120,200,0.14),inset_0_1px_0_rgba(255,255,255,0.95)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-[28px] backdrop-saturate-[180%]">
           {/* Title bar */}
           <div className="flex items-center gap-2 border-b border-white/[0.18] dark:border-white/[0.06] px-4 py-3">
             <div className="h-3 w-3 rounded-full bg-[#ff5f57]" />
             <div className="h-3 w-3 rounded-full bg-[#febc2e]" />
             <div className="h-3 w-3 rounded-full bg-[#28c840]" />
-            <span className="ml-2 text-xs font-medium text-gray-400 dark:text-white/30">
+            <span className="ml-2 text-xs font-medium text-black dark:text-white/30">
               RehanPulse — Sign In
             </span>
           </div>
@@ -175,31 +176,25 @@ function LoginContent() {
               transition={{ delay: 0.15, duration: 0.4 }}
               className="flex flex-col items-center gap-3"
             >
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-lg shadow-indigo-500/25">
-                <svg
-                  viewBox="0 0 24 24"
-                  className="h-8 w-8 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-                </svg>
-              </div>
+              <Image
+                src="/icons/web-app-manifest-512x512.png"
+                alt="RehanPulse"
+                width={64}
+                height={64}
+                className="rounded-2xl shadow-lg shadow-indigo-500/25"
+              />
               <div className="text-center">
-                <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
+                <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-white">
                   Rehan<span className="text-indigo-400">Pulse</span>
                 </h1>
-                <p className="mt-1 text-sm text-gray-500 dark:text-white/40">
+                <p className="mt-1 text-sm text-black dark:text-white/40">
                   Developer Activity Command Center
                 </p>
               </div>
             </motion.div>
 
             {/* Divider */}
-            <div className="h-px w-full bg-gradient-to-r from-transparent via-gray-300 dark:via-white/10 to-transparent" />
+            <div className="h-px w-full bg-gradient-to-r from-transparent via-black/10 dark:via-white/10 to-transparent" />
 
             {/* Sign in button */}
             <motion.div
@@ -208,7 +203,7 @@ function LoginContent() {
               transition={{ delay: 0.3, duration: 0.4 }}
               className="flex w-full flex-col items-center gap-4"
             >
-              <p className="text-center text-sm text-gray-500 dark:text-white/50">
+              <p className="text-center text-sm text-black dark:text-white/50">
                 Sign in with your GitHub account to monitor your repositories,
                 deployments, and metrics.
               </p>
@@ -216,10 +211,10 @@ function LoginContent() {
               <button
                 onClick={handleSignIn}
                 disabled={signingIn || redirecting}
-                className="group relative flex w-full items-center justify-center gap-3 rounded-xl border border-white/[0.85] dark:border-white/[0.12] bg-white/60 dark:bg-[#0c0c1d]/80 backdrop-blur-[28px] px-6 py-3.5 text-sm font-medium text-gray-900 dark:text-white shadow-[0_4px_20px_rgba(100,120,200,0.08)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.2)] transition-all hover:bg-white/80 dark:hover:bg-white/[0.12] hover:border-white dark:hover:border-white/[0.2] disabled:cursor-not-allowed disabled:opacity-50"
+                className="group relative flex w-full items-center justify-center gap-3 rounded-xl border border-white/[0.85] dark:border-white/[0.12] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] px-6 py-3.5 text-sm font-medium text-black dark:text-white shadow-[0_4px_20px_rgba(100,120,200,0.08)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.2)] transition-all hover:bg-white/80 dark:hover:bg-white/[0.12] hover:border-white dark:hover:border-white/[0.2] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {signingIn ? (
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 dark:border-white/20 border-t-gray-900 dark:border-t-white" />
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-black/20 dark:border-white/20 border-t-black dark:border-t-white" />
                 ) : (
                   <svg
                     viewBox="0 0 24 24"
@@ -244,18 +239,20 @@ function LoginContent() {
             </motion.div>
 
             {/* Features preview */}
-            <div className="grid w-full grid-cols-3 gap-3">
+            <div className="grid w-full grid-cols-4 gap-3">
               {[
-                { icon: '📊', label: 'GitHub Activity' },
-                { icon: '🚀', label: 'Deployments' },
-                { icon: '🔥', label: 'Firebase Metrics' },
+                { darkIcon: '/macos-icons/github_darkmode.png', lightIcon: '/macos-icons/github_lightmode.png', label: 'GitHub Activity' },
+                { darkIcon: '/macos-icons/deploy_darkmode.png', lightIcon: '/macos-icons/deploy_lightmode.png', label: 'Deployments' },
+                { darkIcon: '/macos-icons/firebase.png', lightIcon: '/macos-icons/firebase.png', label: 'Firebase Metrics' },
+                { darkIcon: '/macos-icons/vercel.png', lightIcon: '/macos-icons/vercel.png', label: 'Vercel Metrics' },
               ].map((item) => (
                 <div
                   key={item.label}
                   className="flex flex-col items-center gap-1.5 rounded-lg border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[20px] px-2 py-3 text-center"
                 >
-                  <span className="text-lg">{item.icon}</span>
-                  <span className="text-[10px] font-medium text-gray-500 dark:text-white/40">
+                  <img src={item.darkIcon} alt={item.label} width={24} height={24} className="hidden h-6 w-6 dark:block" />
+                  <img src={item.lightIcon} alt={item.label} width={24} height={24} className="block h-6 w-6 dark:hidden" />
+                  <span className="text-[10px] font-medium text-black dark:text-white/40">
                     {item.label}
                   </span>
                 </div>
@@ -265,8 +262,8 @@ function LoginContent() {
 
           {/* Footer */}
           <div className="border-t border-white/[0.18] dark:border-white/[0.06] px-8 py-4">
-            <p className="text-center text-[10px] text-gray-400 dark:text-white/25">
-              Built with Next.js, Firebase & Tailwind CSS
+            <p className="text-center text-[10px] text-black dark:text-white/25">
+              Secured by GitHub OAuth
             </p>
           </div>
         </div>

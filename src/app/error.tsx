@@ -14,7 +14,7 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f0f4ff] dark:bg-[#050608] p-6">
+    <div className="flex min-h-screen items-center justify-center bg-[#f5f5f7] dark:bg-[#050608] p-6">
       <div className="w-full max-w-md rounded-2xl border border-white/[0.85] dark:border-white/[0.08] bg-white/55 dark:bg-[#0c0c1d]/80 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-8 text-center">
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10 dark:bg-red-500/20">
           <svg viewBox="0 0 24 24" className="h-7 w-7 text-red-400" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">

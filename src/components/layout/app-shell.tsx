@@ -19,12 +19,12 @@ import {
 import { CommandPalette, type SpotlightAction } from '@/components/spotlight/command-palette';
 
 const NAV_ITEMS = [
-  { icon: '📊', label: 'Dashboard', id: 'dashboard' },
-  { icon: '🐙', label: 'GitHub Activity', id: 'github' },
-  { icon: '🚀', label: 'Deployments', id: 'deploys' },
-  { icon: '🔥', label: 'Firebase', id: 'firebase' },
-  { icon: '🔔', label: 'Alerts', id: 'alerts' },
-  { icon: '⚙️', label: 'Settings', id: 'settings' },
+  { darkIcon: '/macos-icons/activity-timeline.png', lightIcon: '/macos-icons/activity-timeline.png', label: 'Dashboard', id: 'dashboard' },
+  { darkIcon: '/macos-icons/github_darkmode.png', lightIcon: '/macos-icons/github_lightmode.png', label: 'GitHub Activity', id: 'github' },
+  { darkIcon: '/macos-icons/deploy_darkmode.png', lightIcon: '/macos-icons/deploy_lightmode.png', label: 'Deployments', id: 'deploys' },
+  { darkIcon: '/macos-icons/firebase.png', lightIcon: '/macos-icons/firebase.png', label: 'Firebase', id: 'firebase' },
+  { darkIcon: '/macos-icons/smartalerts_darkmode.png', lightIcon: '/macos-icons/smartalerts_lightmode.png', label: 'Alerts', id: 'alerts' },
+  { darkIcon: '/macos-icons/settings-darkmode.png', lightIcon: '/macos-icons/settings-lightmode.png', label: 'Settings', id: 'settings' },
 ] as const;
 
 type NavId = (typeof NAV_ITEMS)[number]['id'];
@@ -53,8 +53,9 @@ export function AppShell() {
   useEventSource();
 
   // Notifications data
-  const { data: notifsData, unreadCount, markRead, markAllRead } = useNotifications();
+  const { data: notifsData, unreadCount, markRead, markAllRead, clearAll } = useNotifications();
   const notifications = notifsData?.notifications ?? [];
+  const [clearConfirm, setClearConfirm] = useState(false);
 
   // Close notification dropdown on outside click
   useEffect(() => {
@@ -80,7 +81,7 @@ export function AppShell() {
     ...NAV_ITEMS.map((item) => ({
       id: `nav-${item.id}`,
       label: item.label,
-      icon: item.icon,
+      icon: item.label.charAt(0),
       group: 'Navigation',
       keywords: item.label.toLowerCase(),
       onSelect: () => setActiveNav(item.id),
@@ -113,7 +114,7 @@ export function AppShell() {
   ], [theme, setTheme, sidebarOpen, signOut]);
 
   return (
-    <div className="relative flex h-screen overflow-hidden bg-[#f0f4ff] dark:bg-[#050608]">
+    <div className="relative flex h-screen overflow-hidden bg-[#f5f5f7] dark:bg-[#050608]">
       {/* Sidebar */}
       <AnimatePresence mode="wait">
         {sidebarOpen && (
@@ -122,23 +123,17 @@ export function AppShell() {
             animate={{ width: 240, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-            className="relative z-10 flex flex-col border-r border-white/[0.18] dark:border-white/[0.08] bg-white/55 dark:bg-white/[0.04] backdrop-blur-[28px] backdrop-saturate-[180%]"
+            className="relative z-10 flex flex-col border-r border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)]"
           >
             {/* App logo */}
             <div className="flex items-center gap-2 px-5 py-4">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600">
-                <svg
-                  viewBox="0 0 24 24"
-                  className="h-4 w-4 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2.5}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-                </svg>
-              </div>
+              <Image
+                src="/icons/web-app-manifest-512x512.png"
+                alt="RehanPulse"
+                width={32}
+                height={32}
+                className="rounded-lg"
+              />
               <div>
                 <span className="text-sm font-semibold text-gray-900 dark:text-white">
                   Rehan<span className="text-indigo-400">Pulse</span>
@@ -158,7 +153,20 @@ export function AppShell() {
                       : 'text-gray-500 dark:text-white/40 hover:bg-white/50 dark:hover:bg-white/[0.06] hover:text-gray-700 dark:hover:text-white/70'
                   }`}
                 >
-                  <span className="text-base">{item.icon}</span>
+                  <img
+                    src={item.darkIcon}
+                    alt={item.label}
+                    width={20}
+                    height={20}
+                    className="hidden h-5 w-5 dark:block"
+                  />
+                  <img
+                    src={item.lightIcon}
+                    alt={item.label}
+                    width={20}
+                    height={20}
+                    className="block h-5 w-5 dark:hidden"
+                  />
                   <span className="font-medium">{item.label}</span>
                   {item.id === 'alerts' && unreadCount > 0 && (
                     <span className="ml-auto flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
@@ -217,7 +225,7 @@ export function AppShell() {
       {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top menubar */}
-        <header className="relative z-40 flex h-12 shrink-0 items-center justify-between border-b border-white/[0.18] dark:border-white/[0.08] bg-white/55 dark:bg-white/[0.04] px-4 backdrop-blur-[28px] backdrop-saturate-[180%]">
+        <header className="relative z-40 flex h-12 shrink-0 items-center justify-between border-b border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 px-4 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)]">
           <div className="flex items-center gap-3">
             {/* Sidebar toggle */}
             <button
@@ -252,7 +260,7 @@ export function AppShell() {
             <button
               onClick={() => setCmdOpen(true)}
               aria-label="Open command palette"
-              className="ml-2 flex h-7 items-center gap-2 rounded-lg border border-white/[0.18] bg-white/40 px-2.5 text-xs text-gray-400 transition-colors hover:bg-white/60 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/25 dark:hover:bg-white/[0.08]"
+              className="ml-2 flex h-7 items-center gap-2 rounded-lg border border-white/[0.85] bg-white/40 backdrop-blur-sm px-2.5 text-xs text-gray-400 transition-colors hover:bg-white/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] dark:border-white/[0.08] dark:bg-[#0c0c1d]/60 dark:text-white/25 dark:hover:bg-white/[0.08] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
             >
               <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="8" />
@@ -319,7 +327,7 @@ export function AppShell() {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -4, scale: 0.95 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-9 z-[60] w-80 overflow-hidden rounded-xl border border-white/[0.18] bg-white/95 shadow-2xl backdrop-blur-2xl dark:border-white/[0.10] dark:bg-[#0c0c1d] dark:shadow-[0_8px_40px_rgba(0,0,0,0.5)]"
+                    className="absolute right-0 top-9 z-[60] w-80 overflow-hidden rounded-xl border border-white/[0.85] bg-white/40 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:border-white/[0.08] dark:bg-[#0c0c1d]/60 dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)]"
                   >
                     <div className="flex items-center justify-between border-b border-gray-200/60 dark:border-white/[0.08] bg-gray-50/80 dark:bg-white/[0.03] px-4 py-2.5">
                       <span className="text-xs font-semibold text-gray-900 dark:text-white">Notifications</span>
@@ -361,13 +369,36 @@ export function AppShell() {
                       )}
                     </div>
                     {notifications.length > 0 && (
-                      <div className="border-t border-gray-200/60 dark:border-white/[0.08] bg-gray-50/80 dark:bg-white/[0.03] px-4 py-2">
+                      <div className="border-t border-gray-200/60 dark:border-white/[0.08] bg-gray-50/80 dark:bg-white/[0.03] px-4 py-2 flex items-center justify-between">
                         <button
                           onClick={() => { setNotifOpen(false); setActiveNav('alerts'); }}
-                          className="w-full text-center text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors"
+                          className="text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors"
                         >
                           View all in Alerts
                         </button>
+                        {!clearConfirm ? (
+                          <button
+                            onClick={() => setClearConfirm(true)}
+                            className="text-[10px] text-red-400/60 hover:text-red-400 transition-colors"
+                          >
+                            Clear all
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => setClearConfirm(false)}
+                              className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-white/50 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => { clearAll.mutate(); setClearConfirm(false); setNotifOpen(false); }}
+                              className="text-[10px] font-medium text-red-400 hover:text-red-300 transition-colors"
+                            >
+                              Confirm
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </motion.div>

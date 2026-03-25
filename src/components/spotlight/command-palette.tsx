@@ -84,7 +84,7 @@ export function CommandPalette({
             className="fixed left-1/2 top-[20%] z-50 w-full max-w-lg -translate-x-1/2"
           >
             <Command
-              className="overflow-hidden rounded-xl border border-white/[0.18] bg-white/70 shadow-2xl shadow-black/20 backdrop-blur-[28px] backdrop-saturate-[180%] dark:border-white/[0.10] dark:bg-white/[0.08] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
+              className="overflow-hidden rounded-xl border border-white/[0.85] bg-white/40 shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-[28px] backdrop-saturate-[180%] dark:border-white/[0.08] dark:bg-[#0c0c1d]/60 dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)]"
               loop
             >
               {/* Search input */}

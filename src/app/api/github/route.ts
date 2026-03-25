@@ -10,6 +10,10 @@ import {
   fetchRateLimit,
 } from '@/lib/github';
 
+/* Simple in-memory cache */
+const cache = new Map<string, { data: unknown; ts: number }>();
+const CACHE_TTL = 2 * 60_000; // 2 minutes
+
 export async function GET(request: NextRequest) {
   try {
     const session = request.cookies.get('__session')?.value;
@@ -20,6 +24,13 @@ export async function GET(request: NextRequest) {
     const adminAuth = getAdminAuth();
     const decoded = await adminAuth.verifySessionCookie(session, true);
     const uid = decoded.uid;
+
+    const cached = cache.get(uid);
+    if (cached && Date.now() - cached.ts < CACHE_TTL) {
+      return NextResponse.json(cached.data, {
+        headers: { 'Cache-Control': 'private, s-maxage=60, stale-while-revalidate=120' },
+      });
+    }
 
     const octokit = await getOctokitForUser(uid);
 
@@ -33,8 +44,11 @@ export async function GET(request: NextRequest) {
       fetchOpenPRs(octokit, repos),
     ]);
 
+    const payload = { repos, commits, pullRequests, rateLimit };
+    cache.set(uid, { data: payload, ts: Date.now() });
+
     return NextResponse.json(
-      { repos, commits, pullRequests, rateLimit },
+      payload,
       {
         headers: {
           'Cache-Control': 'private, s-maxage=60, stale-while-revalidate=120',

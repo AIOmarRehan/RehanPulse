@@ -8,7 +8,7 @@ import { WidgetErrorBoundary } from './widget-error-boundary';
 export interface WidgetConfig {
   id: string;
   title: string;
-  icon: string;
+  icon: React.ReactNode;
   colSpan?: 1 | 2;
   rowSpan?: 1 | 2;
 }
@@ -52,10 +52,10 @@ function WidgetCard({
         ${widget.colSpan === 2 ? 'col-span-2' : 'col-span-1'}
         ${widget.rowSpan === 2 ? 'row-span-2' : 'row-span-1'}
         ${isDragging
-          ? 'z-50 scale-[1.02] border-indigo-400/40 bg-white/70 shadow-xl shadow-indigo-500/10 dark:border-indigo-400/30 dark:bg-white/[0.08]'
+          ? 'z-50 scale-[1.02] border-indigo-400/40 bg-white/70 shadow-xl shadow-indigo-500/10 dark:border-indigo-400/30 dark:bg-[#0c0c1d]/80'
           : isOver
             ? 'border-indigo-400/30 bg-indigo-50/40 dark:border-indigo-400/20 dark:bg-indigo-500/[0.06]'
-            : 'border-white/[0.18] bg-white/55 shadow-[0_8px_32px_rgba(100,120,200,0.08)] dark:border-white/[0.08] dark:bg-white/[0.04] dark:shadow-[0_8px_32px_rgba(0,0,0,0.2)]'
+            : 'border-white/[0.85] bg-white/40 shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:border-white/[0.08] dark:bg-[#0c0c1d]/60 dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)]'
         }
       `}
       style={{ cursor: isDragging ? 'grabbing' : 'grab' }}

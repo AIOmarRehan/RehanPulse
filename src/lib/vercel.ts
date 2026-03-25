@@ -30,6 +30,7 @@ export interface VercelProject {
 /* ─── Fetchers ─── */
 
 const VERCEL_API = 'https://api.vercel.com';
+const FETCH_TIMEOUT = 15_000; // 15 seconds max per Vercel API call
 
 /** Get the Vercel API token for a user from Firestore. */
 async function getVercelTokenForUser(uid: string): Promise<string> {
@@ -51,6 +52,7 @@ export async function fetchDeployments(uid: string, limit = 10): Promise<VercelD
   const res = await fetch(`${VERCEL_API}/v6/deployments?limit=${limit}`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
+    signal: AbortSignal.timeout(FETCH_TIMEOUT),
   });
 
   if (!res.ok) {
@@ -100,11 +102,12 @@ export async function fetchUsage(uid: string): Promise<VercelUsage> {
     fetch(`${VERCEL_API}/v2/user`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: 'no-store',
+      signal: AbortSignal.timeout(FETCH_TIMEOUT),
     }),
     ...types.map(async (type) => {
       const res = await fetch(
         `${VERCEL_API}/v2/usage?type=${type}&from=${from}&to=${to}`,
-        { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' },
+        { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', signal: AbortSignal.timeout(FETCH_TIMEOUT) },
       );
       if (!res.ok) return { type, data: [] as Record<string, unknown>[] };
       const json = (await res.json()) as { data: Record<string, unknown>[] };
@@ -145,6 +148,7 @@ export async function fetchProjects(uid: string): Promise<VercelProject[]> {
   const res = await fetch(`${VERCEL_API}/v9/projects?limit=20`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
+    signal: AbortSignal.timeout(FETCH_TIMEOUT),
   });
 
   if (!res.ok) {

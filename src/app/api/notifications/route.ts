@@ -82,3 +82,36 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to update notification' }, { status: 500 });
   }
 }
+
+/** DELETE /api/notifications — clear all notifications for the user */
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = request.cookies.get('__session')?.value;
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const user = await getAdminAuth().verifySessionCookie(session, true);
+    const db = getAdminDb();
+
+    const snap = await db
+      .collection('notifications')
+      .where('uid', '==', user.uid)
+      .get();
+
+    if (snap.empty) {
+      return NextResponse.json({ deleted: 0 });
+    }
+
+    const batch = db.batch();
+    for (const doc of snap.docs) {
+      batch.delete(doc.ref);
+    }
+    await batch.commit();
+
+    return NextResponse.json({ deleted: snap.size });
+  } catch (error) {
+    console.error('Notifications DELETE error:', error);
+    return NextResponse.json({ error: 'Failed to clear notifications' }, { status: 500 });
+  }
+}

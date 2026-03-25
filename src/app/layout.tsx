@@ -21,6 +21,10 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   title: 'RehanPulse',
   description: 'Developer Activity Command Center',
+  icons: {
+    icon: '/icons/web-app-manifest-512x512.png',
+    apple: '/icons/apple-touch-icon.png',
+  },
   verification: {
     google: 'FCJAuIHyxvPNVxnn1OQjiyrVwnwejWRnY9Ubp8F_yIc',
   },
@@ -54,7 +58,7 @@ export default function RootLayout({
         <div
           id="__app-loader"
           aria-hidden="true"
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#f0f4ff] dark:bg-[#050608]"
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#f5f5f7] dark:bg-[#050608]"
           style={{ transition: 'opacity 0.4s ease-out' }}
         >
           <div className="relative h-8 w-8">

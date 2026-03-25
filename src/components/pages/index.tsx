@@ -14,16 +14,26 @@ import type { VercelDeployment, VercelProject, VercelUsage } from '@/lib/vercel'
 
 const fadeIn = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } };
 
+/* ─── Theme-aware icon helper ─── */
+function ThemeIcon({ dark, light, alt, size = 16 }: { dark: string; light: string; alt: string; size?: number }) {
+  return (
+    <>
+      <img src={dark} alt={alt} width={size} height={size} className="hidden dark:block" style={{ width: size, height: size }} />
+      <img src={light} alt={alt} width={size} height={size} className="block dark:hidden" style={{ width: size, height: size }} />
+    </>
+  );
+}
+
 /* ─── Widget definitions for Dashboard ─── */
 const DASHBOARD_WIDGETS: WidgetConfig[] = [
-  { id: 'commits', title: 'Recent Commits', icon: '🐙', colSpan: 1 },
-  { id: 'deploys', title: 'Deployments & Live Projects', icon: '🚀', colSpan: 2 },
-  { id: 'prs', title: 'Pull Requests', icon: '📋', colSpan: 1 },
-  { id: 'rate-limit', title: 'API Rate Limit', icon: '⚡', colSpan: 1 },
-  { id: 'vercel-overview', title: 'Vercel Overview', icon: '▲', colSpan: 1 },
-  { id: 'vercel-usage', title: 'Vercel Usage', icon: '📊', colSpan: 2 },
-  { id: 'activity', title: 'Activity Timeline', icon: '📈', colSpan: 2 },
-  { id: 'live-events', title: 'Live Events (SSE)', icon: '📡', colSpan: 2 },
+  { id: 'commits', title: 'Recent Commits', icon: <ThemeIcon dark="/macos-icons/github_darkmode.png" light="/macos-icons/github_lightmode.png" alt="Commits" />, colSpan: 1 },
+  { id: 'deploys', title: 'Deployments & Live Projects', icon: <ThemeIcon dark="/macos-icons/deploy_darkmode.png" light="/macos-icons/deploy_lightmode.png" alt="Deployments" />, colSpan: 2 },
+  { id: 'prs', title: 'Pull Requests', icon: <ThemeIcon dark="/macos-icons/pullrequests-darkmode.png" light="/macos-icons/pullrequests-lightmode.png" alt="PRs" />, colSpan: 1 },
+  { id: 'rate-limit', title: 'API Rate Limit', icon: <ThemeIcon dark="/macos-icons/api-rate-limit.png" light="/macos-icons/api-rate-limit.png" alt="Rate Limit" />, colSpan: 1 },
+  { id: 'vercel-overview', title: 'Vercel Overview', icon: <ThemeIcon dark="/macos-icons/vercel.png" light="/macos-icons/vercel.png" alt="Vercel" />, colSpan: 1 },
+  { id: 'vercel-usage', title: 'Vercel Usage', icon: <svg width="16" height="16" viewBox="0 0 76 65" fill="currentColor" className="text-gray-900 dark:text-white"><path d="M37.5274 0L75.0548 65H0L37.5274 0Z" /></svg>, colSpan: 2 },
+  { id: 'activity', title: 'Activity Timeline', icon: <ThemeIcon dark="/macos-icons/activity-timeline.png" light="/macos-icons/activity-timeline.png" alt="Activity" />, colSpan: 2 },
+  { id: 'live-events', title: 'Live Events (SSE)', icon: <ThemeIcon dark="/macos-icons/live-events.png" light="/macos-icons/live-events.png" alt="Live Events" />, colSpan: 2 },
 ];
 
 function CommitsList({ commits }: { commits: GitHubCommit[] }) {
@@ -38,7 +48,7 @@ function CommitsList({ commits }: { commits: GitHubCommit[] }) {
           href={c.html_url}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-2 rounded-lg bg-white/40 px-3 py-2 text-xs text-gray-600 transition-colors hover:bg-white/60 dark:bg-white/[0.04] dark:text-white/60 dark:hover:bg-white/[0.08]"
+          className="flex items-center gap-2 rounded-lg border border-white/[0.5] bg-white/30 px-3 py-2 text-xs text-gray-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] transition-colors hover:bg-white/50 dark:border-white/[0.06] dark:bg-white/[0.06] dark:text-white/60 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] dark:hover:bg-white/[0.10]"
         >
           <span className="shrink-0 font-mono text-[10px] text-indigo-400">{c.sha}</span>
           <span className="truncate">{c.message}</span>
@@ -60,7 +70,7 @@ function PRsList({ prs }: { prs: GitHubPR[] }) {
           href={pr.html_url}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-2 rounded-lg bg-white/40 px-3 py-2 text-xs text-gray-600 transition-colors hover:bg-white/60 dark:bg-white/[0.04] dark:text-white/60 dark:hover:bg-white/[0.08]"
+          className="flex items-center gap-2 rounded-lg border border-white/[0.5] bg-white/30 px-3 py-2 text-xs text-gray-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] transition-colors hover:bg-white/50 dark:border-white/[0.06] dark:bg-white/[0.06] dark:text-white/60 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] dark:hover:bg-white/[0.10]"
         >
           <span className="shrink-0 text-emerald-400">#{pr.number}</span>
           <span className="truncate">{pr.title}</span>
@@ -167,12 +177,12 @@ function DeploymentsWidget({ deployments, projects, isLoading, error }: { deploy
                 href={`https://${d.url}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 rounded-lg bg-white/40 px-3 py-2 text-xs text-gray-600 transition-colors hover:bg-white/60 dark:bg-white/[0.04] dark:text-white/60 dark:hover:bg-white/[0.08]"
+                className="flex items-center gap-2 rounded-lg border border-white/[0.5] bg-white/30 px-3 py-2 text-xs text-gray-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] transition-colors hover:bg-white/50 dark:border-white/[0.06] dark:bg-white/[0.06] dark:text-white/60 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] dark:hover:bg-white/[0.10]"
               >
                 <div className={`h-1.5 w-1.5 shrink-0 rounded-full ${stateColors[d.state] ?? 'bg-gray-400'}`} />
                 <span className="truncate font-medium">{d.name}</span>
                 <span className="ml-auto shrink-0 text-[10px] text-gray-400 dark:text-white/25">
-                  {d.target === 'production' ? '🔵 Prod' : '🟡 Preview'}
+                  {d.target === 'production' ? 'Prod' : 'Preview'}
                 </span>
                 <span className="shrink-0 text-[10px] text-gray-400 dark:text-white/25">
                   {stateLabels[d.state] ?? d.state} · {ago(d.createdAt)}
@@ -197,7 +207,7 @@ function DeploymentsWidget({ deployments, projects, isLoading, error }: { deploy
               return (
                 <div
                   key={p.id}
-                  className="flex items-center gap-2 rounded-lg bg-white/40 px-3 py-2 text-xs text-gray-600 dark:bg-white/[0.04] dark:text-white/60"
+                  className="flex items-center gap-2 rounded-lg border border-white/[0.5] bg-white/30 px-3 py-2 text-xs text-gray-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] dark:border-white/[0.06] dark:bg-white/[0.06] dark:text-white/60 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                 >
                   <div className={`h-1.5 w-1.5 shrink-0 rounded-full ${p.latestDeploymentState === 'READY' ? 'bg-emerald-400' : 'bg-yellow-400 animate-pulse'}`} />
                   <div className="flex-1 min-w-0">
@@ -252,19 +262,19 @@ function VercelOverviewWidget({ deployments, projects, isLoading, error }: { dep
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-lg bg-white/40 px-3 py-2 dark:bg-white/[0.04]">
+        <div className="rounded-lg border border-white/[0.5] bg-white/30 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] dark:border-white/[0.06] dark:bg-white/[0.06] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
           <p className="text-lg font-semibold text-indigo-400">{projects.length}</p>
           <p className="text-[10px] text-gray-400 dark:text-white/25">Projects</p>
         </div>
-        <div className="rounded-lg bg-white/40 px-3 py-2 dark:bg-white/[0.04]">
+        <div className="rounded-lg border border-white/[0.5] bg-white/30 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] dark:border-white/[0.06] dark:bg-white/[0.06] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
           <p className="text-lg font-semibold text-blue-400">{production}</p>
           <p className="text-[10px] text-gray-400 dark:text-white/25">Production</p>
         </div>
-        <div className="rounded-lg bg-white/40 px-3 py-2 dark:bg-white/[0.04]">
+        <div className="rounded-lg border border-white/[0.5] bg-white/30 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] dark:border-white/[0.06] dark:bg-white/[0.06] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
           <p className="text-lg font-semibold text-emerald-400">{ready}</p>
           <p className="text-[10px] text-gray-400 dark:text-white/25">Successful</p>
         </div>
-        <div className="rounded-lg bg-white/40 px-3 py-2 dark:bg-white/[0.04]">
+        <div className="rounded-lg border border-white/[0.5] bg-white/30 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] dark:border-white/[0.06] dark:bg-white/[0.06] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
           <p className={`text-lg font-semibold ${errored > 0 ? 'text-red-400' : 'text-gray-400 dark:text-white/30'}`}>{errored}</p>
           <p className="text-[10px] text-gray-400 dark:text-white/25">Failed</p>
         </div>
@@ -345,7 +355,7 @@ function VercelUsageWidget({ usage, isLoading, error }: { usage: VercelUsage | n
       </div>
       <div className="grid grid-cols-3 gap-2">
         {metrics.map((m) => (
-          <div key={m.label} className="rounded-lg bg-white/40 px-3 py-2 dark:bg-white/[0.04]">
+          <div key={m.label} className="rounded-lg border border-white/[0.5] bg-white/30 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] dark:border-white/[0.06] dark:bg-white/[0.06] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
             <p className={`text-lg font-semibold ${m.color}`}>{m.value}</p>
             <p className="text-[10px] text-gray-400 dark:text-white/25">{m.label}</p>
           </div>
@@ -451,10 +461,18 @@ function LiveEventsWidget() {
           {events.map((ev) => (
             <div
               key={ev.id}
-              className="flex items-start gap-2 rounded-lg bg-white/40 px-3 py-2 text-xs dark:bg-white/[0.04]"
+              className="flex items-start gap-2 rounded-lg border border-white/[0.5] bg-white/30 px-3 py-2 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] dark:border-white/[0.06] dark:bg-white/[0.06] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
             >
-              <span className="mt-0.5 text-base">
-                {ev.type === 'push' ? '📤' : ev.type.startsWith('pr') ? '🔀' : ev.type === 'ci' ? '⚙️' : ev.type === 'deployment' ? '🚀' : '📌'}
+              <span className="mt-0.5 flex shrink-0 items-center">
+                {ev.type === 'push'
+                  ? <ThemeIcon dark="/macos-icons/commits.png" light="/macos-icons/commits.png" alt="Push" />
+                  : ev.type.startsWith('pr')
+                    ? <ThemeIcon dark="/macos-icons/pullrequests-darkmode.png" light="/macos-icons/pullrequests-lightmode.png" alt="PR" />
+                    : ev.type === 'ci'
+                      ? <ThemeIcon dark="/macos-icons/settings-darkmode.png" light="/macos-icons/settings-lightmode.png" alt="CI" />
+                      : ev.type === 'deployment'
+                        ? <ThemeIcon dark="/macos-icons/deploy_darkmode.png" light="/macos-icons/deploy_lightmode.png" alt="Deploy" />
+                        : <ThemeIcon dark="/macos-icons/red-pin.png" light="/macos-icons/red-pin.png" alt="Event" />}
               </span>
               <div className="flex-1 min-w-0">
                 <p className="truncate text-gray-700 dark:text-white/60">{ev.summary}</p>
@@ -573,12 +591,12 @@ export function GitHubContent() {
                 href={repo.html_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="rounded-xl border border-white/[0.18] dark:border-white/[0.08] bg-white/55 dark:bg-white/[0.04] p-4 transition-colors hover:bg-white/70 dark:hover:bg-white/[0.06]"
+                className="rounded-xl border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] p-4 transition-colors hover:bg-white/50 dark:hover:bg-white/[0.08]"
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-white">
                     {repo.name}
-                    {repo.private && <span className="ml-1.5 text-[9px] text-gray-400 dark:text-white/25">🔒</span>}
+                    {repo.private && <span className="ml-1.5 inline-flex text-[9px] text-gray-400 dark:text-white/25"><svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z"/></svg></span>}
                   </span>
                   <span className="shrink-0 flex items-center gap-1 text-xs text-yellow-500 dark:text-yellow-400">
                     ★ {repo.stargazers_count}
@@ -622,9 +640,9 @@ export function GitHubContent() {
                 target="_blank"
                 rel="noopener noreferrer"
                 {...fadeIn}
-                className="flex items-start gap-3 rounded-xl border border-white/[0.18] dark:border-white/[0.08] bg-white/40 dark:bg-white/[0.03] p-4 transition-colors hover:bg-white/60 dark:hover:bg-white/[0.06]"
+                className="flex items-start gap-3 rounded-xl border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] p-4 transition-colors hover:bg-white/50 dark:hover:bg-white/[0.08]"
               >
-                <span className="mt-0.5 text-base">📤</span>
+                <span className="mt-0.5 flex shrink-0 items-center"><ThemeIcon dark="/macos-icons/commits.png" light="/macos-icons/commits.png" alt="Commit" /></span>
                 <div className="flex-1 min-w-0">
                   <p className="truncate text-sm text-gray-900 dark:text-white">{c.message}</p>
                   <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-400 dark:text-white/35">
@@ -665,9 +683,9 @@ export function GitHubContent() {
                 target="_blank"
                 rel="noopener noreferrer"
                 {...fadeIn}
-                className="flex items-start gap-3 rounded-xl border border-white/[0.18] dark:border-white/[0.08] bg-white/40 dark:bg-white/[0.03] p-4 transition-colors hover:bg-white/60 dark:hover:bg-white/[0.06]"
+                className="flex items-start gap-3 rounded-xl border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] p-4 transition-colors hover:bg-white/50 dark:hover:bg-white/[0.08]"
               >
-                <span className="mt-0.5 text-base">🔀</span>
+                <span className="mt-0.5 flex shrink-0 items-center"><ThemeIcon dark="/macos-icons/pullrequests-darkmode.png" light="/macos-icons/pullrequests-lightmode.png" alt="PR" /></span>
                 <div className="flex-1 min-w-0">
                   <p className="truncate text-sm text-gray-900 dark:text-white">{pr.title}</p>
                   <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-400 dark:text-white/35">
@@ -778,7 +796,7 @@ export function DeploymentsContent() {
             key={s.label}
             {...fadeIn}
             transition={{ delay: 0.05 + i * 0.05 }}
-            className="rounded-xl border border-white/[0.18] dark:border-white/[0.08] bg-white/55 dark:bg-white/[0.04] p-4"
+            className="rounded-xl border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] p-4"
           >
             <p className="text-xs text-gray-400 dark:text-white/30">{s.label}</p>
             {isLoading ? (
@@ -812,7 +830,7 @@ export function DeploymentsContent() {
               rel="noopener noreferrer"
               {...fadeIn}
               transition={{ delay: 0.1 + i * 0.03 }}
-              className="flex items-center gap-4 rounded-xl border border-white/[0.18] dark:border-white/[0.08] bg-white/40 dark:bg-white/[0.03] p-4 transition-colors hover:bg-white/60 dark:hover:bg-white/[0.06]"
+              className="flex items-center gap-4 rounded-xl border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] p-4 transition-colors hover:bg-white/50 dark:hover:bg-white/[0.08]"
             >
               <div className={`h-2.5 w-2.5 shrink-0 rounded-full ${statusColors[d.state] ?? 'bg-gray-400'}`} />
               <div className="flex-1 min-w-0">
@@ -829,7 +847,7 @@ export function DeploymentsContent() {
                 <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-400 dark:text-white/30">
                   <span className="truncate">{d.name}</span>
                   <span>·</span>
-                  <span>{d.target === 'production' ? '🔵 Production' : '🟡 Preview'}</span>
+                  <span>{d.target === 'production' ? 'Production' : 'Preview'}</span>
                   <span>·</span>
                   <span>{statusLabels[d.state] ?? d.state}</span>
                   <span>·</span>
@@ -893,10 +911,10 @@ export function FirebaseContent() {
         <motion.div
           {...fadeIn}
           transition={{ delay: 0.1 }}
-          className="flex flex-col items-center gap-5 rounded-xl border border-white/[0.18] dark:border-white/[0.08] bg-white/55 dark:bg-white/[0.04] p-10 text-center"
+          className="flex flex-col items-center gap-5 rounded-xl border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] p-10 text-center"
         >
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/10 text-3xl">
-            🔥
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/10">
+            <img src="/macos-icons/firebase.png" alt="Firebase" width={32} height={32} className="h-8 w-8" />
           </div>
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -959,7 +977,7 @@ export function FirebaseContent() {
             ))}
           </div>
         ) : projects.length === 0 ? (
-          <div className="rounded-xl border border-white/[0.18] dark:border-white/[0.08] bg-white/55 dark:bg-white/[0.04] p-8 text-center">
+          <div className="rounded-xl border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] p-8 text-center">
             <p className="text-sm text-gray-500 dark:text-white/40">
               No Firebase projects found for this Google account.
             </p>
@@ -974,7 +992,7 @@ export function FirebaseContent() {
                 transition={{ delay: 0.05 * i }}
                 onClick={() => selectProject.mutate(proj.projectId)}
                 disabled={selectProject.isPending}
-                className="flex w-full items-center justify-between rounded-xl border border-white/[0.18] dark:border-white/[0.08] bg-white/55 dark:bg-white/[0.04] p-4 text-left transition hover:bg-white/70 dark:hover:bg-white/[0.07]"
+                className="flex w-full items-center justify-between rounded-xl border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] p-4 text-left transition hover:bg-white/50 dark:hover:bg-white/[0.08]"
               >
                 <div>
                   <span className="font-medium text-gray-900 dark:text-white">
@@ -1046,7 +1064,7 @@ export function FirebaseContent() {
                 key={s.label}
                 {...fadeIn}
                 transition={{ delay: 0.05 + i * 0.05 }}
-                className="rounded-xl border border-white/[0.18] dark:border-white/[0.08] bg-white/55 dark:bg-white/[0.04] p-4"
+                className="rounded-xl border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] p-4"
               >
                 <p className="text-xs text-gray-400 dark:text-white/30">{s.label}</p>
                 <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{s.value}</p>
@@ -1076,7 +1094,7 @@ export function FirebaseContent() {
               return (
                 <div
                   key={c.name}
-                  className="relative overflow-hidden rounded-xl border border-white/[0.18] dark:border-white/[0.08] bg-white/40 dark:bg-white/[0.03] p-4"
+                  className="relative overflow-hidden rounded-xl border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] p-4"
                 >
                   <div
                     className="absolute inset-y-0 left-0 bg-indigo-500/[0.07] dark:bg-indigo-400/[0.06]"
@@ -1128,11 +1146,15 @@ function timeAgo(dateStr: string) {
 }
 
 export function AlertsContent() {
-  const { data: rulesData, isLoading: rulesLoading, toggleRule, createRule, deleteRule } = useAlertRules();
-  const { data: notifsData, isLoading: notifsLoading, markRead, markAllRead } = useNotifications();
+  const { data: rulesData, isLoading: rulesLoading, toggleRule, createRule, renameRule, deleteRule } = useAlertRules();
+  const { data: notifsData, isLoading: notifsLoading, markRead, markAllRead, clearAll } = useNotifications();
   const [showAddRule, setShowAddRule] = useState(false);
   const [newRuleName, setNewRuleName] = useState('');
   const [newRuleEvent, setNewRuleEvent] = useState('push');
+  const [clearConfirm, setClearConfirm] = useState(false);
+  const [duplicateWarning, setDuplicateWarning] = useState('');
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
+  const [editingRuleName, setEditingRuleName] = useState('');
 
   const rules = rulesData?.rules ?? [];
   const notifications = notifsData?.notifications ?? [];
@@ -1140,9 +1162,33 @@ export function AlertsContent() {
 
   const handleAddRule = () => {
     if (!newRuleName.trim()) return;
-    createRule.mutate({ name: newRuleName.trim(), eventType: newRuleEvent });
-    setNewRuleName('');
-    setShowAddRule(false);
+    // Client-side duplicate check by eventType
+    const existingByEvent = rules.find((r) => r.eventType === newRuleEvent);
+    if (existingByEvent) {
+      setDuplicateWarning(`An alert rule for this event type already exists ("${existingByEvent.name}")`);
+      return;
+    }
+    setDuplicateWarning('');
+    createRule.mutate(
+      { name: newRuleName.trim(), eventType: newRuleEvent },
+      {
+        onSuccess: () => {
+          setNewRuleName('');
+          setShowAddRule(false);
+        },
+        onError: (err) => {
+          if (err.message.includes('already exists')) {
+            setDuplicateWarning(err.message);
+          }
+        },
+      }
+    );
+  };
+
+  const handleRename = (id: string) => {
+    if (!editingRuleName.trim()) return;
+    renameRule.mutate({ id, name: editingRuleName.trim() });
+    setEditingRuleId(null);
   };
 
   return (
@@ -1166,7 +1212,7 @@ export function AlertsContent() {
             key={s.label}
             {...fadeIn}
             transition={{ delay: 0.05 + i * 0.05 }}
-            className="rounded-xl border border-white/[0.18] dark:border-white/[0.08] bg-white/55 dark:bg-white/[0.04] p-4"
+            className="rounded-xl border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] p-4"
           >
             <p className="text-xs text-gray-400 dark:text-white/30">{s.label}</p>
             {rulesLoading || notifsLoading ? (
@@ -1184,14 +1230,42 @@ export function AlertsContent() {
           <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-white/30">
             Recent Notifications
           </h3>
-          {unreadCount > 0 && (
-            <button
-              onClick={() => markAllRead.mutate()}
-              className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
-            >
-              Mark all read
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {unreadCount > 0 && (
+              <button
+                onClick={() => markAllRead.mutate()}
+                className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+              >
+                Mark all read
+              </button>
+            )}
+            {notifications.length > 0 && (
+              !clearConfirm ? (
+                <button
+                  onClick={() => setClearConfirm(true)}
+                  className="text-xs text-red-400/60 hover:text-red-400 transition-colors"
+                >
+                  Clear all
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-red-400/80">Delete all notifications?</span>
+                  <button
+                    onClick={() => setClearConfirm(false)}
+                    className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-white/50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => { clearAll.mutate(); setClearConfirm(false); }}
+                    className="text-xs font-medium text-red-400 hover:text-red-300 transition-colors"
+                  >
+                    Confirm
+                  </button>
+                </div>
+              )
+            )}
+          </div>
         </div>
         {notifsLoading ? (
           <div className="space-y-2">
@@ -1269,17 +1343,18 @@ export function AlertsContent() {
               exit={{ height: 0, opacity: 0 }}
               className="overflow-hidden"
             >
-              <div className="mb-3 flex gap-2 rounded-xl border border-indigo-500/20 bg-indigo-500/[0.04] p-4">
+              <div className="mb-3 flex flex-col gap-2 rounded-xl border border-indigo-500/20 bg-indigo-500/[0.04] p-4">
+                <div className="flex gap-2">
                 <input
                   type="text"
                   value={newRuleName}
-                  onChange={(e) => setNewRuleName(e.target.value)}
+                  onChange={(e) => { setNewRuleName(e.target.value); setDuplicateWarning(''); }}
                   placeholder="Rule name..."
                   className="flex-1 rounded-lg border border-white/[0.18] bg-white/40 px-3 py-1.5 text-sm text-gray-900 placeholder-gray-400 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white dark:placeholder-white/30"
                 />
                 <select
                   value={newRuleEvent}
-                  onChange={(e) => setNewRuleEvent(e.target.value)}
+                  onChange={(e) => { setNewRuleEvent(e.target.value); setDuplicateWarning(''); }}
                   className="rounded-lg border border-white/[0.18] bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-white/[0.08] dark:bg-[#1a1a2e] dark:text-white"
                 >
                   {EVENT_TYPES.map((t) => (
@@ -1293,6 +1368,13 @@ export function AlertsContent() {
                 >
                   Add
                 </button>
+                </div>
+                {duplicateWarning && (
+                  <p className="text-xs text-yellow-500 dark:text-yellow-400">
+                    <svg className="mr-1 inline h-3 w-3" viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+                    {duplicateWarning}
+                  </p>
+                )}
               </div>
             </motion.div>
           )}
@@ -1313,13 +1395,47 @@ export function AlertsContent() {
             {rules.map((r) => (
               <div
                 key={r.id}
-                className="flex items-center justify-between rounded-xl border border-white/[0.18] dark:border-white/[0.08] bg-white/55 dark:bg-[#0c0c1d]/80 backdrop-blur-xl p-4 transition-colors"
+                className="group/rule flex items-center justify-between rounded-xl border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] p-4 transition-colors"
               >
                 <div className="flex-1 min-w-0">
-                  <span className="text-sm font-medium text-gray-800 dark:text-white/80">{r.name}</span>
-                  <p className="mt-0.5 text-[10px] text-gray-400 dark:text-white/25">
-                    Triggers on: {EVENT_TYPES.find((t) => t.value === r.eventType)?.label ?? r.eventType}
-                  </p>
+                  {editingRuleId === r.id ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={editingRuleName}
+                        onChange={(e) => setEditingRuleName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleRename(r.id); if (e.key === 'Escape') setEditingRuleId(null); }}
+                        autoFocus
+                        className="rounded-lg border border-indigo-500/30 bg-white/40 px-2 py-1 text-sm text-gray-900 dark:border-white/[0.12] dark:bg-white/[0.06] dark:text-white"
+                      />
+                      <button
+                        onClick={() => handleRename(r.id)}
+                        className="text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setEditingRuleId(null)}
+                        className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-white/50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span
+                        onClick={() => { setEditingRuleId(r.id); setEditingRuleName(r.name); }}
+                        className="text-sm font-medium text-gray-800 dark:text-white/80 cursor-pointer hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors inline-flex items-center gap-1.5"
+                        title="Click to rename"
+                      >
+                        {r.name}
+                        <svg className="h-3 w-3 opacity-0 group-hover/rule:opacity-60 transition-opacity" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                      </span>
+                      <p className="mt-0.5 text-[10px] text-gray-400 dark:text-white/25">
+                        Triggers on: {EVENT_TYPES.find((t) => t.value === r.eventType)?.label ?? r.eventType}
+                      </p>
+                    </>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   <button
@@ -1514,13 +1630,13 @@ export function SettingsContent() {
           ) : (
             <>
               <IntegrationRow
-                icon="🐙"
+                icon={<ThemeIcon dark="/macos-icons/github_darkmode.png" light="/macos-icons/github_lightmode.png" alt="GitHub" size={20} />}
                 name="GitHub"
                 description="OAuth connected — repos, commits, and PRs are synced automatically"
                 connected={!!settings?.hasGitHubToken}
               />
               <IntegrationRow
-                icon="📡"
+                icon={<ThemeIcon dark="/macos-icons/live-events.png" light="/macos-icons/live-events.png" alt="Webhooks" size={20} />}
                 name="GitHub Webhooks"
                 description={settings?.webhooksRegistered
                   ? 'Webhooks active — receiving real-time events from your repos'
@@ -1536,7 +1652,7 @@ export function SettingsContent() {
                 </button>
               </IntegrationRow>
               <IntegrationRow
-                icon="▲"
+                icon={<img src="/macos-icons/vercel.png" alt="Vercel" width={20} height={20} className="h-5 w-5" />}
                 name="Vercel"
                 description={settings?.hasVercelToken ? 'Connected — deployments are synced' : 'Not configured — add your token below'}
                 connected={!!settings?.hasVercelToken}
@@ -1550,10 +1666,10 @@ export function SettingsContent() {
       <motion.div
         {...fadeIn}
         transition={{ delay: 0.2 }}
-        className="rounded-xl border border-white/[0.18] dark:border-white/[0.08] bg-white/55 dark:bg-white/[0.04] p-5"
+        className="rounded-xl border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] p-5"
       >
         <div className="flex items-center gap-2 mb-4">
-          <span className="text-lg">▲</span>
+          <img src="/macos-icons/vercel.png" alt="Vercel" width={20} height={20} className="h-5 w-5" />
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Vercel API Token</h3>
         </div>
         <p className="mb-4 text-xs text-gray-400 dark:text-white/30">
@@ -1625,7 +1741,76 @@ export function SettingsContent() {
           </p>
         </div>
       </motion.div>
+
+      {/* Danger Zone */}
+      <DangerZone />
     </>
+  );
+}
+
+function DangerZone() {
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      const res = await fetch('/api/account', { method: 'DELETE' });
+      if (res.ok) {
+        window.location.href = '/home';
+      }
+    } catch {
+      setDeleting(false);
+      setConfirming(false);
+    }
+  };
+
+  return (
+    <motion.div {...fadeIn} transition={{ delay: 0.4 }} className="mt-8">
+      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-red-400/70">
+        Danger Zone
+      </h3>
+      <div className="rounded-xl border border-red-500/20 bg-red-500/[0.04] p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-gray-900 dark:text-white">Delete Account</p>
+            <p className="mt-1 text-xs text-gray-500 dark:text-white/40">
+              Permanently delete your account and all associated data (notifications, alert rules, tokens).
+            </p>
+          </div>
+          {!confirming ? (
+            <button
+              onClick={() => setConfirming(true)}
+              className="shrink-0 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20"
+            >
+              Delete Account
+            </button>
+          ) : (
+            <div className="flex shrink-0 flex-col items-end gap-2">
+              <p className="text-[11px] text-red-400/80 max-w-[220px] text-right">
+                You can sign in again with your GitHub account, but your data (notifications, rules) will be lost.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setConfirming(false)}
+                  disabled={deleting}
+                  className="rounded-lg border border-white/[0.18] dark:border-white/[0.08] px-3 py-1.5 text-xs text-gray-500 dark:text-white/40 transition-colors hover:bg-white/50 dark:hover:bg-white/[0.06]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-red-600 disabled:opacity-50"
+                >
+                  {deleting ? 'Deleting...' : 'Yes, Delete Everything'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </motion.div>
   );
 }
 
@@ -1636,15 +1821,15 @@ function IntegrationRow({
   connected,
   children,
 }: {
-  icon: string;
+  icon: React.ReactNode;
   name: string;
   description: string;
   connected: boolean;
   children?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-white/[0.18] dark:border-white/[0.08] bg-white/40 dark:bg-white/[0.03] p-4">
-      <span className="text-lg">{icon}</span>
+    <div className="flex items-center gap-3 rounded-xl border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] p-4">
+      <span className="flex shrink-0 items-center">{icon}</span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-gray-900 dark:text-white">{name}</span>

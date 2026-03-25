@@ -25,12 +25,12 @@ const THEMES = {
     bloom: [0.28, 0.55],
   },
   light: {
-    bgColor: 0xf0f4ff,
-    fogColor: 0xdde8ff,
-    fogDensity: 0.0012,
-    exposure: 1.45,
-    starOpacity: 0.07,
-    bloom: [0.12, 0.22],
+    bgColor: 0xf5f5f7,
+    fogColor: 0xf5f5f7,
+    fogDensity: 0.0004,
+    exposure: 1.0,
+    starOpacity: 0.0,
+    bloom: [0, 0],
   },
 };
 
@@ -42,12 +42,12 @@ const PALETTES = [
     new THREE.Color(0x2da8c4), new THREE.Color(0xa8f5e8),
     new THREE.Color(0x6dd4c8), new THREE.Color(0xcef5ff),
   ],
-  // Plasma Dipole (light mode — dark particles)
+  // Plasma Dipole (light mode — black particles)
   [
-    new THREE.Color(0x080810), new THREE.Color(0x0d0d18),
-    new THREE.Color(0x111120), new THREE.Color(0x090912),
-    new THREE.Color(0x050508), new THREE.Color(0x0f0f1a),
-    new THREE.Color(0x070710), new THREE.Color(0x060610),
+    new THREE.Color(0x000000), new THREE.Color(0x000000),
+    new THREE.Color(0x000000), new THREE.Color(0x000000),
+    new THREE.Color(0x000000), new THREE.Color(0x000000),
+    new THREE.Color(0x000000), new THREE.Color(0x000000),
   ],
 ];
 

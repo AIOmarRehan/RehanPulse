@@ -1,0 +1,628 @@
+'use client';
+
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { motion, useScroll, useTransform, useInView, AnimatePresence } from 'framer-motion';
+import { useTheme } from 'next-themes';
+import { useRouter } from 'next/navigation';
+import { AnimatedBackground } from '@/components/ui/animated-background';
+
+/* ─── Animation Presets ─── */
+const ease = [0.22, 1, 0.36, 1] as const;
+const fadeUp = {
+  initial: { opacity: 0, y: 24 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.5, ease },
+};
+const stagger = { animate: { transition: { staggerChildren: 0.08 } } };
+
+/* ─── Cursor Glow Hook ─── */
+function useCursorGlow(ref: React.RefObject<HTMLElement | null>) {
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const onMove = (e: MouseEvent) => {
+      const r = el.getBoundingClientRect();
+      setPos({ x: e.clientX - r.left, y: e.clientY - r.top });
+    };
+    el.addEventListener('mousemove', onMove);
+    return () => el.removeEventListener('mousemove', onMove);
+  }, [ref]);
+  return pos;
+}
+
+/* ─── Mocked Dashboard Preview ─── */
+const DEMO_TABS = ['Dashboard', 'GitHub', 'Deployments', 'Usage'] as const;
+
+function DemoSlide({ tab }: { tab: typeof DEMO_TABS[number] }) {
+  if (tab === 'Dashboard') {
+    return (
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: 'Commits Today', value: '14', color: 'text-indigo-400' },
+          { label: 'Open PRs', value: '3', color: 'text-emerald-400' },
+          { label: 'Deployments', value: '7', color: 'text-blue-400' },
+        ].map((s) => (
+          <div key={s.label} className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
+            <p className={`text-xl font-semibold ${s.color}`}>{s.value}</p>
+            <p className="text-[10px] text-white/30">{s.label}</p>
+          </div>
+        ))}
+        <div className="col-span-2 rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
+          <p className="text-[10px] font-semibold text-white/40 mb-2">Activity</p>
+          <div className="flex items-end gap-1.5 h-16">
+            {[40, 65, 50, 80, 45, 70, 90].map((h, i) => (
+              <motion.div
+                key={i}
+                initial={{ height: 0 }}
+                animate={{ height: `${h}%` }}
+                transition={{ delay: 0.3 + i * 0.05, duration: 0.5, ease }}
+                className="flex-1 rounded-t bg-gradient-to-t from-indigo-500/40 to-indigo-400/20"
+              />
+            ))}
+          </div>
+        </div>
+        <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
+          <p className={`text-xl font-semibold text-amber-400`}>98.2%</p>
+          <p className="text-[10px] text-white/30">Success Rate</p>
+        </div>
+      </div>
+    );
+  }
+  if (tab === 'GitHub') {
+    return (
+      <div className="space-y-2">
+        {[
+          { sha: 'a1b2c3d', msg: 'feat: add usage widget', time: '2h ago', repo: 'RehanPulse' },
+          { sha: 'e4f5g6h', msg: 'fix: auth redirect loop', time: '5h ago', repo: 'RehanPulse' },
+          { sha: 'i7j8k9l', msg: 'chore: update deps', time: '1d ago', repo: 'portfolio' },
+          { sha: 'm0n1o2p', msg: 'feat: dark mode support', time: '2d ago', repo: 'RehanPulse' },
+        ].map((c) => (
+          <div key={c.sha} className="flex items-center gap-3 rounded-lg bg-white/[0.04] border border-white/[0.06] px-3 py-2">
+            <span className="font-mono text-[10px] text-indigo-400">{c.sha}</span>
+            <span className="truncate text-xs text-white/60">{c.msg}</span>
+            <span className="ml-auto shrink-0 text-[10px] text-white/25">{c.repo} · {c.time}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  if (tab === 'Deployments') {
+    return (
+      <div className="space-y-2">
+        {[
+          { name: 'my-app', state: 'Ready', branch: 'main', env: 'Production', time: '10m ago', dot: 'bg-emerald-400' },
+          { name: 'my-app', state: 'Building', branch: 'feat/widgets', env: 'Preview', time: 'now', dot: 'bg-yellow-400 animate-pulse' },
+          { name: 'portfolio', state: 'Ready', branch: 'main', env: 'Production', time: '3h ago', dot: 'bg-emerald-400' },
+        ].map((d, i) => (
+          <div key={i} className="flex items-center gap-3 rounded-lg bg-white/[0.04] border border-white/[0.06] px-3 py-2.5">
+            <div className={`h-2 w-2 rounded-full ${d.dot}`} />
+            <div className="flex-1 min-w-0">
+              <span className="text-xs font-medium text-white/70">{d.name}</span>
+              <div className="flex gap-2 text-[10px] text-white/30">
+                <span>{d.env}</span><span>·</span><span>{d.branch}</span><span>·</span><span>{d.state}</span><span>·</span><span>{d.time}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  // Usage
+  return (
+    <div className="grid grid-cols-3 gap-3">
+      {[
+        { label: 'Requests', value: '24.3K', color: 'text-blue-400' },
+        { label: 'Bandwidth', value: '1.2 GB', color: 'text-indigo-400' },
+        { label: 'Build Min', value: '47', color: 'text-amber-400' },
+        { label: 'Functions', value: '0.018 GB-hr', color: 'text-emerald-400' },
+        { label: 'Cache Reads', value: '4.2 MB', color: 'text-cyan-400' },
+        { label: 'Plan', value: 'Hobby', color: 'text-purple-400' },
+      ].map((m) => (
+        <div key={m.label} className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
+          <p className={`text-lg font-semibold ${m.color}`}>{m.value}</p>
+          <p className="text-[10px] text-white/30">{m.label}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DashboardPreview() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mouse = useCursorGlow(containerRef);
+  const [activeTab, setActiveTab] = useState<typeof DEMO_TABS[number]>('Dashboard');
+
+  // Auto-rotate tabs
+  useEffect(() => {
+    const id = setInterval(() => {
+      setActiveTab((prev) => {
+        const idx = DEMO_TABS.indexOf(prev);
+        return DEMO_TABS[(idx + 1) % DEMO_TABS.length]!;
+      });
+    }, 4000);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative mx-auto w-full max-w-3xl"
+      style={{
+        transform: `perspective(1200px) rotateX(${(mouse.y - 200) * 0.008}deg) rotateY(${(mouse.x - 400) * -0.008}deg)`,
+        transition: 'transform 0.15s ease-out',
+      }}
+    >
+      {/* Glow */}
+      <div
+        className="pointer-events-none absolute -inset-px rounded-2xl opacity-40 blur-xl"
+        style={{
+          background: `radial-gradient(600px circle at ${mouse.x}px ${mouse.y}px, rgba(99,102,241,0.15), transparent 40%)`,
+        }}
+      />
+
+      <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0c0c1d]/80 shadow-2xl shadow-black/40 backdrop-blur-xl">
+        {/* Title bar */}
+        <div className="flex items-center gap-2 border-b border-white/[0.06] px-4 py-3">
+          <div className="h-3 w-3 rounded-full bg-[#ff5f57]" />
+          <div className="h-3 w-3 rounded-full bg-[#febc2e]" />
+          <div className="h-3 w-3 rounded-full bg-[#28c840]" />
+          <span className="ml-2 text-xs font-medium text-white/30">RehanPulse — Dashboard</span>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-1 border-b border-white/[0.06] px-4 pt-2">
+          {DEMO_TABS.map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`relative px-3 py-2 text-xs font-medium transition-colors ${
+                activeTab === tab ? 'text-white' : 'text-white/30 hover:text-white/50'
+              }`}
+            >
+              {tab}
+              {activeTab === tab && (
+                <motion.div
+                  layoutId="demo-tab-indicator"
+                  className="absolute inset-x-0 -bottom-px h-px bg-indigo-400"
+                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                />
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div className="p-5 min-h-[220px]">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.3, ease }}
+            >
+              <DemoSlide tab={activeTab} />
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Feature Card ─── */
+function FeatureCard({ icon, title, desc, index }: { icon: string; title: string; desc: string; index: number }) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const mouse = useCursorGlow(cardRef);
+
+  return (
+    <motion.div
+      ref={cardRef}
+      variants={{ initial: { opacity: 0, y: 24 }, animate: { opacity: 1, y: 0, transition: { duration: 0.5, delay: index * 0.08, ease } } }}
+      whileHover={{ y: -4, transition: { duration: 0.2 } }}
+      className="group relative overflow-hidden rounded-2xl border border-gray-200 dark:border-white/[0.06] bg-white dark:bg-white/[0.03] p-6 transition-shadow hover:shadow-lg hover:shadow-indigo-500/5"
+    >
+      {/* Cursor light */}
+      <div
+        className="pointer-events-none absolute -inset-px rounded-2xl opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+        style={{
+          background: `radial-gradient(400px circle at ${mouse.x}px ${mouse.y}px, rgba(99,102,241,0.08), transparent 40%)`,
+        }}
+      />
+      <div className="relative">
+        <span className="text-2xl">{icon}</span>
+        <h3 className="mt-3 text-sm font-semibold text-gray-900 dark:text-white">{title}</h3>
+        <p className="mt-1.5 text-xs leading-relaxed text-gray-500 dark:text-white/40">{desc}</p>
+      </div>
+    </motion.div>
+  );
+}
+
+/* ─── Section Wrapper ─── */
+function Section({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, margin: '-80px' });
+  return (
+    <motion.section
+      ref={ref}
+      initial={{ opacity: 0, y: 32 }}
+      animate={inView ? { opacity: 1, y: 0 } : {}}
+      transition={{ duration: 0.6, ease }}
+      className={`relative mx-auto max-w-5xl px-6 ${className}`}
+    >
+      {children}
+    </motion.section>
+  );
+}
+
+/* ─── Step (How It Works) ─── */
+function Step({ num, title, desc, isLast }: { num: number; title: string; desc: string; isLast: boolean }) {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, margin: '-60px' });
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, x: -24 }}
+      animate={inView ? { opacity: 1, x: 0 } : {}}
+      transition={{ duration: 0.5, ease }}
+      className="relative flex gap-5"
+    >
+      {/* Line + dot */}
+      <div className="flex flex-col items-center">
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={inView ? { scale: 1 } : {}}
+          transition={{ duration: 0.3, delay: 0.1, ease }}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-500/10 dark:bg-indigo-500/20 text-sm font-bold text-indigo-500 dark:text-indigo-400 ring-2 ring-indigo-500/20"
+        >
+          {num}
+        </motion.div>
+        {!isLast && (
+          <motion.div
+            initial={{ scaleY: 0 }}
+            animate={inView ? { scaleY: 1 } : {}}
+            transition={{ duration: 0.5, delay: 0.2, ease }}
+            className="w-px flex-1 origin-top bg-gradient-to-b from-indigo-500/30 to-transparent"
+          />
+        )}
+      </div>
+      <div className="pb-10">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h3>
+        <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-white/40">{desc}</p>
+      </div>
+    </motion.div>
+  );
+}
+
+/* ─── Why Bullet ─── */
+function WhyBullet({ text, index }: { text: string; index: number }) {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, margin: '-40px' });
+  return (
+    <motion.li
+      ref={ref}
+      initial={{ opacity: 0, x: -16 }}
+      animate={inView ? { opacity: 1, x: 0 } : {}}
+      transition={{ duration: 0.4, delay: index * 0.1, ease }}
+      className="flex items-center gap-3 text-sm text-gray-600 dark:text-white/50"
+    >
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-500 dark:text-emerald-400">
+        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      </span>
+      {text}
+    </motion.li>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   Homepage
+   ═══════════════════════════════════════════════════ */
+export default function HomePage() {
+  const router = useRouter();
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  const heroRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll();
+  const heroOpacity = useTransform(scrollYProgress, [0, 0.15], [1, 0]);
+  const heroScale = useTransform(scrollYProgress, [0, 0.15], [1, 0.97]);
+
+  useEffect(() => setMounted(true), []);
+
+  const goLogin = useCallback(() => router.push('/login'), [router]);
+
+  return (
+    <div className="relative min-h-screen overflow-x-hidden bg-gray-50 dark:bg-[#0a0a1a] text-gray-900 dark:text-white">
+      {/* Animated smoke background (dark mode) */}
+      {mounted && theme === 'dark' && <AnimatedBackground />}
+
+      {/* ─── Navbar ─── */}
+      <nav className="sticky top-0 z-50 border-b border-gray-200/60 dark:border-white/[0.04] bg-gray-50/80 dark:bg-[#0a0a1a]/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 shadow-sm shadow-indigo-500/25">
+              <svg viewBox="0 0 24 24" className="h-4 w-4 text-white" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+              </svg>
+            </div>
+            <span className="text-sm font-semibold tracking-tight">Rehan<span className="text-indigo-400">Pulse</span></span>
+          </div>
+
+          <div className="hidden items-center gap-6 text-xs text-gray-500 dark:text-white/40 sm:flex">
+            <a href="#features" className="transition-colors hover:text-gray-900 dark:hover:text-white/80">Features</a>
+            <a href="#how-it-works" className="transition-colors hover:text-gray-900 dark:hover:text-white/80">How It Works</a>
+            <a href="#demo" className="transition-colors hover:text-gray-900 dark:hover:text-white/80">Demo</a>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {mounted && (
+              <button
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] text-gray-500 dark:text-white/50 transition-all hover:bg-gray-100 dark:hover:bg-white/[0.1]"
+                aria-label="Toggle theme"
+              >
+                {theme === 'dark' ? (
+                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
+                )}
+              </button>
+            )}
+            <button
+              onClick={goLogin}
+              className="rounded-lg bg-indigo-500 px-4 py-1.5 text-xs font-medium text-white shadow-sm shadow-indigo-500/25 transition-all hover:bg-indigo-600 hover:shadow-md hover:shadow-indigo-500/30 hover:scale-[1.02] active:scale-[0.98]"
+            >
+              Get Started
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      {/* ─── Hero ─── */}
+      <motion.div ref={heroRef} style={{ opacity: heroOpacity, scale: heroScale }}>
+        <section className="relative pb-20 pt-24 sm:pt-32">
+          {/* Gradient orbs */}
+          <div className="pointer-events-none absolute -left-32 -top-32 h-96 w-96 rounded-full bg-indigo-600/10 dark:bg-indigo-600/15 blur-[120px]" />
+          <div className="pointer-events-none absolute -right-32 top-20 h-80 w-80 rounded-full bg-violet-500/10 dark:bg-violet-500/10 blur-[100px]" />
+
+          <div className="mx-auto max-w-5xl px-6 text-center">
+            <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease }}>
+              <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
+                Your Developer Activity,{' '}
+                <span className="bg-gradient-to-r from-indigo-500 to-violet-500 bg-clip-text text-transparent">
+                  One Command Center
+                </span>
+              </h1>
+            </motion.div>
+
+            <motion.p
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.15, ease }}
+              className="mx-auto mt-5 max-w-2xl text-sm leading-relaxed text-gray-500 dark:text-white/45 sm:text-base"
+            >
+              Track GitHub activity, deployments, and backend metrics in real time — all from one clean, unified dashboard.
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3, ease }}
+              className="mt-8 flex justify-center gap-4"
+            >
+              <button
+                onClick={goLogin}
+                className="group relative inline-flex items-center gap-2 rounded-xl bg-indigo-500 px-6 py-3 text-sm font-medium text-white shadow-lg shadow-indigo-500/25 transition-all hover:bg-indigo-600 hover:shadow-xl hover:shadow-indigo-500/30 hover:scale-[1.03] active:scale-[0.98]"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" /></svg>
+                Get Started
+                {/* Glow pulse */}
+                <span className="absolute inset-0 -z-10 rounded-xl bg-indigo-400/20 blur-xl transition-opacity group-hover:opacity-75 opacity-0 animate-pulse" />
+              </button>
+              <a
+                href="#demo"
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-300 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] px-6 py-3 text-sm font-medium text-gray-700 dark:text-white/70 transition-all hover:bg-gray-50 dark:hover:bg-white/[0.08] hover:scale-[1.03] active:scale-[0.98]"
+              >
+                View Demo
+              </a>
+            </motion.div>
+          </div>
+
+          {/* Dashboard preview with parallax */}
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.45, ease }}
+            className="mt-16 px-6"
+          >
+            <DashboardPreview />
+          </motion.div>
+        </section>
+      </motion.div>
+
+      {/* ─── Features ─── */}
+      <Section className="py-24" >
+        <div id="features" className="scroll-mt-20">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl font-bold sm:text-3xl">Everything you need, <span className="text-indigo-400">in one place</span></h2>
+            <p className="mt-3 text-sm text-gray-500 dark:text-white/40">Built for developers who ship fast and want to stay informed.</p>
+          </div>
+
+          <motion.div
+            variants={stagger}
+            initial="initial"
+            whileInView="animate"
+            viewport={{ once: true, margin: '-80px' }}
+            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          >
+            {[
+              { icon: '🐙', title: 'GitHub Activity', desc: 'Track commits, pull requests, and CI status in one place.' },
+              { icon: '🚀', title: 'Deployment Monitoring', desc: 'Stay updated with live deployment states and logs.' },
+              { icon: '🔥', title: 'Firebase Metrics', desc: 'Monitor reads, writes, and authentication events.' },
+              { icon: '⚡', title: 'Real-Time Updates', desc: 'Instant updates powered by Server-Sent Events — no polling.' },
+              { icon: '🔔', title: 'Smart Alerts', desc: 'Get notified instantly when deployments fail or errors spike.' },
+              { icon: '📊', title: 'Usage Analytics', desc: 'Track bandwidth, build minutes, and function usage at a glance.' },
+            ].map((f, i) => (
+              <FeatureCard key={f.title} icon={f.icon} title={f.title} desc={f.desc} index={i} />
+            ))}
+          </motion.div>
+        </div>
+      </Section>
+
+      {/* ─── How It Works ─── */}
+      <Section className="py-24">
+        <div id="how-it-works" className="scroll-mt-20">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl font-bold sm:text-3xl">How it works</h2>
+            <p className="mt-3 text-sm text-gray-500 dark:text-white/40">Three steps to full visibility.</p>
+          </div>
+
+          <div className="mx-auto max-w-md">
+            {[
+              { title: 'Connect your services', desc: 'Link your GitHub, Vercel, and Firebase accounts.' },
+              { title: 'RehanPulse listens', desc: 'Events are collected and processed in real time.' },
+              { title: 'Stay in control', desc: 'View everything from a single, unified dashboard.' },
+            ].map((s, i, arr) => (
+              <Step key={s.title} num={i + 1} title={s.title} desc={s.desc} isLast={i === arr.length - 1} />
+            ))}
+          </div>
+        </div>
+      </Section>
+
+      {/* ─── Why RehanPulse ─── */}
+      <Section className="py-24">
+        <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
+          <div>
+            <h2 className="text-2xl font-bold sm:text-3xl">Why <span className="text-indigo-400">RehanPulse</span>?</h2>
+            <p className="mt-3 text-sm text-gray-500 dark:text-white/40">Focus on building. Let us handle the monitoring.</p>
+            <ul className="mt-8 space-y-4">
+              {[
+                'Built for developers who value clarity',
+                'Reduces context switching between tools',
+                'Real-time visibility into your workflow',
+                'Lightweight, fast, and efficient',
+              ].map((t, i) => (
+                <WhyBullet key={t} text={t} index={i} />
+              ))}
+            </ul>
+          </div>
+
+          {/* Tech visual */}
+          <div className="flex flex-wrap justify-center gap-3">
+            {['Next.js', 'React', 'TypeScript', 'Tailwind', 'Firebase', 'Framer Motion', 'Vercel'].map((t, i) => (
+              <motion.span
+                key={t}
+                initial={{ opacity: 0, scale: 0.8 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.06, duration: 0.4, ease }}
+                className="rounded-full border border-gray-200 dark:border-white/[0.06] bg-white dark:bg-white/[0.03] px-4 py-2 text-xs font-medium text-gray-600 dark:text-white/50 transition-all hover:border-indigo-400/40 hover:text-indigo-500 dark:hover:text-indigo-400"
+              >
+                {t}
+              </motion.span>
+            ))}
+          </div>
+        </div>
+      </Section>
+
+      {/* ─── Demo Section ─── */}
+      <Section className="py-24">
+        <div id="demo" className="scroll-mt-20">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl font-bold sm:text-3xl">See it in action</h2>
+            <p className="mt-3 text-sm text-gray-500 dark:text-white/40">See your entire development workflow at a glance.</p>
+          </div>
+          <DashboardPreview />
+        </div>
+      </Section>
+
+      {/* ─── Final CTA ─── */}
+      <Section className="py-24">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, ease }}
+          className="relative overflow-hidden rounded-3xl border border-gray-200 dark:border-white/[0.06] bg-gradient-to-br from-indigo-500/5 via-transparent to-violet-500/5 dark:from-indigo-500/10 dark:to-violet-500/10 px-8 py-16 text-center"
+        >
+          <div className="pointer-events-none absolute -left-20 -top-20 h-60 w-60 rounded-full bg-indigo-500/10 blur-[80px]" />
+          <div className="pointer-events-none absolute -bottom-20 -right-20 h-60 w-60 rounded-full bg-violet-500/10 blur-[80px]" />
+
+          <h2 className="relative text-2xl font-bold sm:text-3xl">
+            Start monitoring your projects <span className="text-indigo-400">like a pro</span>.
+          </h2>
+          <p className="relative mt-3 text-sm text-gray-500 dark:text-white/40">
+            Free to get started. No credit card required.
+          </p>
+          <motion.div className="relative mt-8">
+            <button
+              onClick={goLogin}
+              className="group relative inline-flex items-center gap-2 rounded-xl bg-indigo-500 px-8 py-3.5 text-sm font-medium text-white shadow-lg shadow-indigo-500/25 transition-all hover:bg-indigo-600 hover:shadow-xl hover:shadow-indigo-500/30 hover:scale-[1.03] active:scale-[0.98]"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" /></svg>
+              Get Started
+              <span className="absolute inset-0 -z-10 rounded-xl bg-indigo-400/20 blur-xl opacity-0 group-hover:opacity-60 transition-opacity animate-pulse" />
+            </button>
+          </motion.div>
+        </motion.div>
+      </Section>
+
+      {/* ─── Footer ─── */}
+      <footer className="mt-12 border-t border-gray-200 dark:border-white/[0.04]">
+        <div className="mx-auto max-w-5xl px-6 py-12">
+          <div className="flex flex-col items-center gap-8 sm:flex-row sm:items-start sm:justify-between">
+            {/* Brand */}
+            <div className="text-center sm:text-left">
+              <div className="flex items-center gap-2 justify-center sm:justify-start">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600">
+                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-white" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                  </svg>
+                </div>
+                <span className="text-sm font-semibold">Rehan<span className="text-indigo-400">Pulse</span></span>
+              </div>
+              <p className="mt-2 max-w-xs text-xs leading-relaxed text-gray-400 dark:text-white/30">
+                A developer-focused command center for monitoring your entire workflow in real time.
+              </p>
+            </div>
+
+            {/* Links */}
+            <div className="flex gap-8 text-xs text-gray-500 dark:text-white/40">
+              <div className="space-y-2">
+                <p className="font-semibold text-gray-700 dark:text-white/60">Product</p>
+                <a href="#features" className="block transition-colors hover:text-gray-900 dark:hover:text-white/70">Features</a>
+                <a href="#how-it-works" className="block transition-colors hover:text-gray-900 dark:hover:text-white/70">How It Works</a>
+                <a href="#demo" className="block transition-colors hover:text-gray-900 dark:hover:text-white/70">Demo</a>
+              </div>
+              <div className="space-y-2">
+                <p className="font-semibold text-gray-700 dark:text-white/60">Stack</p>
+                <span className="block">Next.js</span>
+                <span className="block">Firebase</span>
+                <span className="block">Vercel</span>
+              </div>
+            </div>
+
+            {/* Social */}
+            <div>
+              <a
+                href="https://github.com/omar-rei"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 dark:border-white/[0.06] bg-white dark:bg-white/[0.03] px-4 py-2 text-xs text-gray-600 dark:text-white/50 transition-all hover:border-gray-300 dark:hover:border-white/[0.1] hover:text-gray-900 dark:hover:text-white/80"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" /></svg>
+                GitHub
+              </a>
+            </div>
+          </div>
+
+          <div className="mt-10 border-t border-gray-200 dark:border-white/[0.04] pt-6 text-center text-[11px] text-gray-400 dark:text-white/20">
+            Built by <span className="font-medium text-gray-600 dark:text-white/40">Omar Rehan</span>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}

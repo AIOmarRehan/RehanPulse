@@ -7,7 +7,7 @@ import { useGitHubData } from '@/hooks/use-github-data';
 import { useVercelData } from '@/hooks/use-vercel-data';
 import { useEventStore } from '@/lib/stores/event-store';
 import type { GitHubCommit, GitHubPR, RateLimitInfo } from '@/lib/github';
-import type { VercelDeployment, VercelProject } from '@/lib/vercel';
+import type { VercelDeployment, VercelProject, VercelUsage } from '@/lib/vercel';
 
 const fadeIn = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } };
 
@@ -17,6 +17,8 @@ const DASHBOARD_WIDGETS: WidgetConfig[] = [
   { id: 'deploys', title: 'Deployments & Live Projects', icon: '🚀', colSpan: 2 },
   { id: 'prs', title: 'Pull Requests', icon: '📋', colSpan: 1 },
   { id: 'rate-limit', title: 'API Rate Limit', icon: '⚡', colSpan: 1 },
+  { id: 'vercel-overview', title: 'Vercel Overview', icon: '▲', colSpan: 1 },
+  { id: 'vercel-usage', title: 'Vercel Usage', icon: '📊', colSpan: 2 },
   { id: 'activity', title: 'Activity Timeline', icon: '📈', colSpan: 2 },
   { id: 'live-events', title: 'Live Events (SSE)', icon: '📡', colSpan: 2 },
 ];
@@ -221,6 +223,135 @@ function DeploymentsWidget({ deployments, projects, isLoading, error }: { deploy
   );
 }
 
+function VercelOverviewWidget({ deployments, projects, isLoading, error }: { deployments: VercelDeployment[]; projects: VercelProject[]; isLoading: boolean; error: Error | null }) {
+  if (isLoading) return <WidgetSkeleton />;
+  if (error) {
+    const isNoToken = error.message?.includes('No Vercel token') || error.message?.includes('Vercel API failed');
+    return (
+      <p className="text-xs text-gray-400 dark:text-white/30">
+        {isNoToken ? 'Add your Vercel token in Settings.' : 'Vercel data unavailable'}
+      </p>
+    );
+  }
+
+  const ready = deployments.filter((d) => d.state === 'READY').length;
+  const errored = deployments.filter((d) => d.state === 'ERROR' || d.state === 'CANCELED').length;
+  const building = deployments.filter((d) => d.state === 'BUILDING' || d.state === 'INITIALIZING' || d.state === 'QUEUED').length;
+  const production = deployments.filter((d) => d.target === 'production').length;
+  const successRate = deployments.length > 0 ? Math.round((ready / deployments.length) * 100) : 0;
+
+  const frameworks = new Map<string, number>();
+  for (const p of projects) {
+    const fw = p.framework ?? 'Other';
+    frameworks.set(fw, (frameworks.get(fw) ?? 0) + 1);
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-white/[0.03]">
+          <p className="text-lg font-semibold text-indigo-400">{projects.length}</p>
+          <p className="text-[10px] text-gray-400 dark:text-white/25">Projects</p>
+        </div>
+        <div className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-white/[0.03]">
+          <p className="text-lg font-semibold text-blue-400">{production}</p>
+          <p className="text-[10px] text-gray-400 dark:text-white/25">Production</p>
+        </div>
+        <div className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-white/[0.03]">
+          <p className="text-lg font-semibold text-emerald-400">{ready}</p>
+          <p className="text-[10px] text-gray-400 dark:text-white/25">Successful</p>
+        </div>
+        <div className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-white/[0.03]">
+          <p className={`text-lg font-semibold ${errored > 0 ? 'text-red-400' : 'text-gray-400 dark:text-white/30'}`}>{errored}</p>
+          <p className="text-[10px] text-gray-400 dark:text-white/25">Failed</p>
+        </div>
+      </div>
+
+      {building > 0 && (
+        <div className="flex items-center gap-2 text-[11px] text-yellow-400">
+          <span className="h-1.5 w-1.5 rounded-full bg-yellow-400 animate-pulse" />
+          {building} currently building
+        </div>
+      )}
+
+      {/* Success rate */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-white/40">
+          <span>Success rate</span>
+          <strong className={successRate >= 90 ? 'text-emerald-400' : successRate >= 70 ? 'text-yellow-400' : 'text-red-400'}>{successRate}%</strong>
+        </div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-white/[0.06]">
+          <div
+            className={`h-full rounded-full transition-all ${successRate >= 90 ? 'bg-emerald-400' : successRate >= 70 ? 'bg-yellow-400' : 'bg-red-400'}`}
+            style={{ width: `${Math.max(successRate, 2)}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Frameworks */}
+      {frameworks.size > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {Array.from(frameworks.entries()).map(([fw, count]) => (
+            <span key={fw} className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-500 dark:bg-white/[0.06] dark:text-white/40">
+              {fw} ({count})
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VercelUsageWidget({ usage, isLoading, error }: { usage: VercelUsage | null; isLoading: boolean; error: Error | null }) {
+  if (isLoading) return <WidgetSkeleton />;
+  if (error) {
+    const isNoToken = error.message?.includes('No Vercel token') || error.message?.includes('Vercel API failed');
+    return (
+      <p className="text-xs text-gray-400 dark:text-white/30">
+        {isNoToken ? 'Add your Vercel token in Settings.' : 'Usage data unavailable'}
+      </p>
+    );
+  }
+  if (!usage) return <p className="text-xs text-gray-400 dark:text-white/30">No usage data</p>;
+
+  const fmt = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(1)}K` : String(n);
+  const fmtBytes = (b: number) => b >= 1_073_741_824 ? `${(b / 1_073_741_824).toFixed(2)} GB` : b >= 1_048_576 ? `${(b / 1_048_576).toFixed(1)} MB` : b >= 1024 ? `${(b / 1024).toFixed(1)} KB` : `${b} B`;
+
+  const planColors: Record<string, string> = {
+    hobby: 'bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-white/50',
+    pro: 'bg-indigo-500/10 text-indigo-500 dark:bg-indigo-500/20 dark:text-indigo-400',
+    enterprise: 'bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400',
+  };
+  const planLabel = usage.subscription.charAt(0).toUpperCase() + usage.subscription.slice(1);
+  const planColor = planColors[usage.subscription] ?? planColors['hobby'];
+
+  const metrics = [
+    { label: 'Requests', value: fmt(usage.requests), color: 'text-blue-400' },
+    { label: 'Bandwidth', value: fmtBytes(usage.bandwidth), color: 'text-indigo-400' },
+    { label: 'Build Minutes', value: String(usage.buildMinutes), color: 'text-amber-400' },
+    { label: 'Function GB-hrs', value: usage.functionGBHours.toFixed(3), color: 'text-emerald-400' },
+    { label: 'Cache Reads', value: fmtBytes(usage.dataCacheReads), color: 'text-cyan-400' },
+    { label: 'Cache Writes', value: fmtBytes(usage.dataCacheWrites), color: 'text-purple-400' },
+  ];
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] text-gray-400 dark:text-white/25">Current billing period</p>
+        <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${planColor}`}>{planLabel}</span>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {metrics.map((m) => (
+          <div key={m.label} className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-white/[0.03]">
+            <p className={`text-lg font-semibold ${m.color}`}>{m.value}</p>
+            <p className="text-[10px] text-gray-400 dark:text-white/25">{m.label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ActivityTimeline({ commits }: { commits: GitHubCommit[] }) {
   // Aggregate commits by day of week (Mon=0 ... Sun=6)
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -347,6 +478,12 @@ export function DashboardContent({ userName }: { userName?: string }) {
     if (widget.id === 'deploys') {
       return <DeploymentsWidget deployments={vercelData?.deployments ?? []} projects={vercelData?.projects ?? []} isLoading={vercelLoading} error={vercelError as Error | null} />;
     }
+    if (widget.id === 'vercel-overview') {
+      return <VercelOverviewWidget deployments={vercelData?.deployments ?? []} projects={vercelData?.projects ?? []} isLoading={vercelLoading} error={vercelError as Error | null} />;
+    }
+    if (widget.id === 'vercel-usage') {
+      return <VercelUsageWidget usage={vercelData?.usage ?? null} isLoading={vercelLoading} error={vercelError as Error | null} />;
+    }
     if (widget.id === 'activity') {
       if (isLoading) return <WidgetSkeleton />;
       return <ActivityTimeline commits={data?.commits ?? []} />;
@@ -423,12 +560,12 @@ export function GitHubContent() {
                 rel="noopener noreferrer"
                 className="rounded-xl border border-gray-200 dark:border-white/[0.06] bg-white dark:bg-white/[0.03] p-4 transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.05]"
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-white">
                     {repo.name}
                     {repo.private && <span className="ml-1.5 text-[9px] text-gray-400 dark:text-white/25">🔒</span>}
                   </span>
-                  <span className="flex items-center gap-1 text-xs text-yellow-500 dark:text-yellow-400">
+                  <span className="shrink-0 flex items-center gap-1 text-xs text-yellow-500 dark:text-yellow-400">
                     ★ {repo.stargazers_count}
                   </span>
                 </div>
@@ -543,19 +680,72 @@ export function GitHubContent() {
 
 /* ─── Deployments ─── */
 export function DeploymentsContent() {
-  const deploys = [
-    { env: 'Production', status: 'ready', branch: 'main', commit: 'feat: macOS UI', duration: '42s', time: '2h ago' },
-    { env: 'Preview', status: 'building', branch: 'feature/widgets', commit: 'wip: widget grid', duration: '—', time: '10m ago' },
-    { env: 'Preview', status: 'ready', branch: 'fix/auth-loop', commit: 'fix: redirect loop', duration: '38s', time: '8h ago' },
-    { env: 'Production', status: 'ready', branch: 'main', commit: 'chore: deploy config', duration: '45s', time: '1d ago' },
-    { env: 'Preview', status: 'error', branch: 'experiment/sse', commit: 'test: SSE streaming', duration: '12s', time: '2d ago' },
-  ];
+  const { data: vercelData, isLoading, error } = useVercelData(50);
+  const deployments = vercelData?.deployments ?? [];
 
   const statusColors: Record<string, string> = {
-    ready: 'bg-emerald-400',
-    building: 'bg-yellow-400 animate-pulse',
-    error: 'bg-red-400',
+    READY: 'bg-emerald-400',
+    BUILDING: 'bg-yellow-400 animate-pulse',
+    INITIALIZING: 'bg-yellow-400 animate-pulse',
+    QUEUED: 'bg-blue-400 animate-pulse',
+    ERROR: 'bg-red-400',
+    CANCELED: 'bg-gray-400',
   };
+
+  const statusLabels: Record<string, string> = {
+    READY: 'Ready',
+    BUILDING: 'Building',
+    INITIALIZING: 'Initializing',
+    QUEUED: 'Queued',
+    ERROR: 'Error',
+    CANCELED: 'Canceled',
+  };
+
+  const ago = (ms: number) => {
+    const diff = Date.now() - ms;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  };
+
+  const duration = (d: VercelDeployment) => {
+    if (d.buildingAt && d.ready) {
+      const secs = Math.round((d.ready - d.buildingAt) / 1000);
+      return secs >= 60 ? `${Math.floor(secs / 60)}m ${secs % 60}s` : `${secs}s`;
+    }
+    return '—';
+  };
+
+  // Computed stats
+  const ready = deployments.filter((d) => d.state === 'READY').length;
+  const failed = deployments.filter((d) => d.state === 'ERROR' || d.state === 'CANCELED').length;
+  const successRate = deployments.length > 0 ? ((ready / deployments.length) * 100).toFixed(1) : '0';
+  const avgDuration = (() => {
+    const durations = deployments
+      .filter((d) => d.buildingAt && d.ready)
+      .map((d) => (d.ready! - d.buildingAt!) / 1000);
+    if (durations.length === 0) return '—';
+    const avg = Math.round(durations.reduce((a, b) => a + b, 0) / durations.length);
+    return avg >= 60 ? `${Math.floor(avg / 60)}m ${avg % 60}s` : `${avg}s`;
+  })();
+
+  const stats = [
+    { label: 'Total Deploys', value: String(deployments.length), sub: 'Loaded' },
+    { label: 'Success Rate', value: `${successRate}%`, sub: `${failed} failure${failed !== 1 ? 's' : ''}` },
+    { label: 'Avg Duration', value: avgDuration, sub: 'Build time' },
+  ];
+
+  if (error) {
+    const isNoToken = (error as Error).message?.includes('No Vercel token') || (error as Error).message?.includes('Vercel API failed');
+    return (
+      <div className="rounded-xl border border-red-500/20 bg-red-500/[0.06] p-4 text-sm text-red-400">
+        {isNoToken ? 'Add your Vercel token in Settings to see deployments.' : (error as Error).message}
+      </div>
+    );
+  }
 
   return (
     <>
@@ -568,11 +758,7 @@ export function DeploymentsContent() {
 
       {/* Stats */}
       <div className="mb-6 grid grid-cols-3 gap-4">
-        {[
-          { label: 'Total Deploys', value: '127', sub: 'This month' },
-          { label: 'Success Rate', value: '96.8%', sub: '3 failures' },
-          { label: 'Avg Duration', value: '41s', sub: '-5s vs last week' },
-        ].map((s, i) => (
+        {stats.map((s, i) => (
           <motion.div
             key={s.label}
             {...fadeIn}
@@ -580,42 +766,67 @@ export function DeploymentsContent() {
             className="rounded-xl border border-gray-200 dark:border-white/[0.06] bg-white dark:bg-white/[0.03] p-4"
           >
             <p className="text-xs text-gray-400 dark:text-white/30">{s.label}</p>
-            <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{s.value}</p>
-            <p className="mt-1 text-[11px] text-gray-400 dark:text-white/25">{s.sub}</p>
+            {isLoading ? (
+              <div className="mt-1 h-8 w-16 animate-pulse rounded bg-gray-100 dark:bg-white/[0.04]" />
+            ) : (
+              <>
+                <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{s.value}</p>
+                <p className="mt-1 text-[11px] text-gray-400 dark:text-white/25">{s.sub}</p>
+              </>
+            )}
           </motion.div>
         ))}
       </div>
 
       {/* Deploy list */}
-      <div className="space-y-2">
-        {deploys.map((d, i) => (
-          <motion.div
-            key={i}
-            {...fadeIn}
-            transition={{ delay: 0.2 + i * 0.05 }}
-            className="flex items-center gap-4 rounded-xl border border-gray-200 dark:border-white/[0.06] bg-gray-50 dark:bg-white/[0.02] p-4"
-          >
-            <div className={`h-2.5 w-2.5 rounded-full ${statusColors[d.status]}`} />
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-900 dark:text-white">{d.commit}</span>
-                <span className="rounded bg-gray-100 dark:bg-white/[0.06] px-1.5 py-0.5 font-mono text-[10px] text-gray-500 dark:text-white/40">
-                  {d.branch}
-                </span>
+      {isLoading ? (
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-16 animate-pulse rounded-xl border border-gray-200 bg-gray-100 dark:border-white/[0.06] dark:bg-white/[0.03]" />
+          ))}
+        </div>
+      ) : deployments.length === 0 ? (
+        <p className="text-sm text-gray-400 dark:text-white/30">No deployments found.</p>
+      ) : (
+        <div className="space-y-2">
+          {deployments.map((d, i) => (
+            <motion.a
+              key={d.uid}
+              href={`https://${d.url}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              {...fadeIn}
+              transition={{ delay: 0.1 + i * 0.03 }}
+              className="flex items-center gap-4 rounded-xl border border-gray-200 dark:border-white/[0.06] bg-gray-50 dark:bg-white/[0.02] p-4 transition-colors hover:bg-gray-100 dark:hover:bg-white/[0.04]"
+            >
+              <div className={`h-2.5 w-2.5 shrink-0 rounded-full ${statusColors[d.state] ?? 'bg-gray-400'}`} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="truncate text-sm font-medium text-gray-900 dark:text-white">
+                    {d.meta?.githubCommitMessage ?? d.name}
+                  </span>
+                  {d.meta?.githubCommitRef && (
+                    <span className="shrink-0 rounded bg-gray-100 dark:bg-white/[0.06] px-1.5 py-0.5 font-mono text-[10px] text-gray-500 dark:text-white/40">
+                      {d.meta.githubCommitRef}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-400 dark:text-white/30">
+                  <span className="truncate">{d.name}</span>
+                  <span>·</span>
+                  <span>{d.target === 'production' ? '🔵 Production' : '🟡 Preview'}</span>
+                  <span>·</span>
+                  <span>{statusLabels[d.state] ?? d.state}</span>
+                  <span>·</span>
+                  <span>{duration(d)}</span>
+                  <span>·</span>
+                  <span>{ago(d.createdAt)}</span>
+                </div>
               </div>
-              <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-400 dark:text-white/30">
-                <span>{d.env}</span>
-                <span>·</span>
-                <span className="capitalize">{d.status}</span>
-                <span>·</span>
-                <span>{d.duration}</span>
-                <span>·</span>
-                <span>{d.time}</span>
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+            </motion.a>
+          ))}
+        </div>
+      )}
     </>
   );
 }

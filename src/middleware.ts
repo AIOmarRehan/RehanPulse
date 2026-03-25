@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const PUBLIC_PATHS = ['/login', '/api/auth', '/api/webhooks', '/api/stream'];
+const PUBLIC_PATHS = ['/home', '/login', '/api/auth', '/api/webhooks', '/api/stream'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -17,6 +17,10 @@ export function middleware(request: NextRequest) {
   const session = request.cookies.get('__session')?.value;
 
   if (!session) {
+    // Root path → send to homepage; other paths → login with redirect
+    if (pathname === '/') {
+      return NextResponse.redirect(new URL('/home', request.url));
+    }
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);

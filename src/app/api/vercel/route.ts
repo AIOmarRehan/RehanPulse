@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminAuth } from '@/lib/firebase-admin';
-import { fetchDeployments, fetchProjects } from '@/lib/vercel';
+import { fetchDeployments, fetchProjects, fetchUsage } from '@/lib/vercel';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,13 +14,17 @@ export async function GET(request: NextRequest) {
     const adminAuth = getAdminAuth();
     const decoded = await adminAuth.verifySessionCookie(session, true);
 
-    const [deployments, projects] = await Promise.all([
-      fetchDeployments(decoded.uid, 10),
+    const limitParam = request.nextUrl.searchParams.get('limit');
+    const limit = Math.min(Math.max(Number(limitParam) || 10, 1), 100);
+
+    const [deployments, projects, usage] = await Promise.all([
+      fetchDeployments(decoded.uid, limit),
       fetchProjects(decoded.uid),
+      fetchUsage(decoded.uid).catch(() => null),
     ]);
 
     return NextResponse.json(
-      { deployments, projects },
+      { deployments, projects, usage },
       {
         headers: {
           'Cache-Control': 'private, s-maxage=30, stale-while-revalidate=60',

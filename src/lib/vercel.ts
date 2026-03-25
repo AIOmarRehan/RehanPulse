@@ -10,6 +10,8 @@ export interface VercelDeployment {
   state: 'BUILDING' | 'ERROR' | 'INITIALIZING' | 'QUEUED' | 'READY' | 'CANCELED';
   target: string | null; // 'production' | 'preview' | null
   createdAt: number;   // epoch ms
+  buildingAt?: number; // epoch ms — when build started
+  ready?: number;      // epoch ms — when deployment became ready
   meta?: {
     githubCommitRef?: string;
     githubCommitMessage?: string;
@@ -48,6 +50,7 @@ export async function fetchDeployments(uid: string, limit = 10): Promise<VercelD
 
   const res = await fetch(`${VERCEL_API}/v6/deployments?limit=${limit}`, {
     headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
   });
 
   if (!res.ok) {
@@ -63,8 +66,76 @@ export async function fetchDeployments(uid: string, limit = 10): Promise<VercelD
     state: d.state as VercelDeployment['state'],
     target: (d.target as string | null) ?? null,
     createdAt: d.createdAt as number,
+    buildingAt: (d.buildingAt as number | undefined) ?? undefined,
+    ready: (d.ready as number | undefined) ?? undefined,
     meta: d.meta as VercelDeployment['meta'],
   }));
+}
+
+/* ─── Usage types ─── */
+
+export interface VercelUsage {
+  subscription: string;    // e.g. 'hobby', 'pro', 'enterprise'
+  requests: number;
+  bandwidth: number;       // bytes outgoing
+  buildMinutes: number;
+  functionGBHours: number;
+  dataCacheReads: number;  // bytes sent
+  dataCacheWrites: number; // bytes received
+}
+
+/** Fetch billing usage for the current period. */
+export async function fetchUsage(uid: string): Promise<VercelUsage> {
+  const token = await getVercelTokenForUser(uid);
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const from = monthStart.toISOString();
+  const to = now.toISOString();
+
+  const types = ['requests', 'builds', 'data_cache'] as const;
+
+  // Fetch user info (for subscription) in parallel with usage data
+  const [userRes, ...results] = await Promise.all([
+    fetch(`${VERCEL_API}/v2/user`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    }),
+    ...types.map(async (type) => {
+      const res = await fetch(
+        `${VERCEL_API}/v2/usage?type=${type}&from=${from}&to=${to}`,
+        { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' },
+      );
+      if (!res.ok) return { type, data: [] as Record<string, unknown>[] };
+      const json = (await res.json()) as { data: Record<string, unknown>[] };
+      return { type, data: json.data ?? [] };
+    }),
+  ]);
+
+  let subscription = 'hobby';
+  if (userRes.ok) {
+    const userJson = (await userRes.json()) as { user?: { billing?: { plan?: string } } };
+    subscription = userJson.user?.billing?.plan ?? 'hobby';
+  }
+
+  const byType = Object.fromEntries(results.map((r) => [r.type, r.data]));
+
+  const sum = (arr: Record<string, unknown>[], key: string) =>
+    arr.reduce((acc, d) => acc + (Number(d[key]) || 0), 0);
+
+  const reqData = byType['requests'] ?? [];
+  const buildData = byType['builds'] ?? [];
+  const cacheData = byType['data_cache'] ?? [];
+
+  return {
+    subscription,
+    requests: sum(reqData, 'request_hit_count') + sum(reqData, 'request_miss_count'),
+    bandwidth: sum(reqData, 'bandwidth_outgoing_bytes'),
+    functionGBHours: sum(reqData, 'function_execution_successful_gb_hours'),
+    buildMinutes: Math.round(sum(buildData, 'build_build_seconds') / 60),
+    dataCacheReads: sum(cacheData, 'data_cache_total_sent_bytes'),
+    dataCacheWrites: sum(cacheData, 'data_cache_total_received_bytes'),
+  };
 }
 
 /** Fetch all projects for a user. */
@@ -73,6 +144,7 @@ export async function fetchProjects(uid: string): Promise<VercelProject[]> {
 
   const res = await fetch(`${VERCEL_API}/v9/projects?limit=20`, {
     headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
   });
 
   if (!res.ok) {

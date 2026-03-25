@@ -81,6 +81,8 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString(),
       // Store a summary, not the entire payload
       summary: buildSummary(eventType, action, payload),
+      groupKey: extractGroupKey(eventType, repoName ?? '', payload),
+      groupTitle: extractGroupTitle(eventType, repoName ?? '', payload),
     };
 
     // Write to Firestore via Admin SDK (bypasses security rules)
@@ -114,6 +116,59 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Webhook processing error:', error);
     return NextResponse.json({ error: 'Processing failed' }, { status: 500 });
+  }
+}
+
+/** Extract a group key to tie related notifications (same commit) together. */
+function extractGroupKey(eventType: string, repo: string, payload: unknown): string | null {
+  const p = payload as Record<string, unknown>;
+  switch (eventType) {
+    case 'push': {
+      const headCommit = p.head_commit as Record<string, unknown> | undefined;
+      const sha = headCommit?.id as string | undefined;
+      return sha ? `${repo}:${sha.slice(0, 12)}` : null;
+    }
+    case 'workflow_run': {
+      const wr = p.workflow_run as Record<string, unknown> | undefined;
+      const sha = wr?.head_sha as string | undefined;
+      return sha ? `${repo}:${sha.slice(0, 12)}` : null;
+    }
+    case 'check_run': {
+      const cr = p.check_run as Record<string, unknown> | undefined;
+      const sha = cr?.head_sha as string | undefined;
+      return sha ? `${repo}:${sha.slice(0, 12)}` : null;
+    }
+    default:
+      return null;
+  }
+}
+
+/** Extract a human-readable group title (repo + commit message). */
+function extractGroupTitle(eventType: string, repo: string, payload: unknown): string | null {
+  const p = payload as Record<string, unknown>;
+  const repoShort = repo.split('/')[1] ?? repo;
+  switch (eventType) {
+    case 'push': {
+      const headCommit = p.head_commit as Record<string, unknown> | undefined;
+      const msg = (headCommit?.message as string | undefined)?.split('\n')[0] ?? '';
+      return `${repoShort} — ${msg}`;
+    }
+    case 'workflow_run': {
+      const wr = p.workflow_run as Record<string, unknown> | undefined;
+      const msg = wr?.head_commit
+        ? ((wr.head_commit as Record<string, unknown>).message as string | undefined)?.split('\n')[0] ?? ''
+        : '';
+      return msg ? `${repoShort} — ${msg}` : `${repoShort}`;
+    }
+    case 'check_run': {
+      const cr = p.check_run as Record<string, unknown> | undefined;
+      const checkSuite = cr?.check_suite as Record<string, unknown> | undefined;
+      const headCommit = checkSuite?.head_commit as Record<string, unknown> | undefined;
+      const msg = (headCommit?.message as string | undefined)?.split('\n')[0] ?? '';
+      return msg ? `${repoShort} — ${msg}` : `${repoShort}`;
+    }
+    default:
+      return null;
   }
 }
 
@@ -160,7 +215,7 @@ function buildSummary(eventType: string, action: string | undefined, payload: un
 /** Evaluate alert rules against a new event and create notifications for matching rules. */
 async function evaluateAlertRules(
   db: Firestore,
-  event: { type: string; summary: string; createdAt: string },
+  event: { type: string; summary: string; createdAt: string; repo: string | null; groupKey: string | null; groupTitle: string | null },
 ) {
   try {
     // Find all enabled rules that match this event type
@@ -197,6 +252,9 @@ async function evaluateAlertRules(
         eventType: event.type,
         read: false,
         createdAt: event.createdAt,
+        ...(event.groupKey ? { groupKey: event.groupKey } : {}),
+        ...(event.groupTitle ? { groupTitle: event.groupTitle } : {}),
+        ...(event.repo ? { repo: event.repo } : {}),
       });
     }
 

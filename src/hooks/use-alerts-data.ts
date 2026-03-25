@@ -19,6 +19,9 @@ export interface Notification {
   eventType: string;
   read: boolean;
   createdAt: string;
+  groupKey?: string;
+  groupTitle?: string;
+  repo?: string;
 }
 
 async function fetchAlerts(): Promise<{ rules: AlertRule[] }> {

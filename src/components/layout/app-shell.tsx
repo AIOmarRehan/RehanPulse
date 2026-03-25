@@ -54,8 +54,52 @@ export function AppShell() {
 
   // Notifications data
   const { data: notifsData, unreadCount, markRead, markAllRead, clearAll } = useNotifications();
-  const notifications = notifsData?.notifications ?? [];
+  const notifications = useMemo(() => notifsData?.notifications ?? [], [notifsData]);
   const [clearConfirm, setClearConfirm] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  const toggleGroup = useCallback((key: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }, []);
+
+  // Group notifications by groupKey — ungrouped items remain standalone
+  type NotifGroup = { key: string; title: string; items: Notification[] } | { key: null; item: Notification };
+  const groupedNotifications = useMemo(() => {
+    const groups: NotifGroup[] = [];
+    const keyMap = new Map<string, { title: string; items: Notification[] }>();
+    const order: (string | Notification)[] = [];
+
+    for (const n of notifications) {
+      if (n.groupKey) {
+        let g = keyMap.get(n.groupKey);
+        if (!g) {
+          g = { title: n.groupTitle ?? n.groupKey, items: [] };
+          keyMap.set(n.groupKey, g);
+          order.push(n.groupKey);
+        }
+        g.items.push(n);
+      } else {
+        order.push(n);
+      }
+    }
+
+    for (const entry of order) {
+      if (typeof entry === 'string') {
+        const g = keyMap.get(entry);
+        if (g && g.items.length > 0) {
+          groups.push({ key: entry, title: g.title, items: g.items });
+          keyMap.delete(entry); // prevent duplicates
+        }
+      } else {
+        groups.push({ key: null, item: entry });
+      }
+    }
+    return groups.slice(0, 15);
+  }, [notifications]);
 
   // Close notification dropdown on outside click
   useEffect(() => {
@@ -371,24 +415,96 @@ export function AppShell() {
                           No notifications yet
                         </div>
                       ) : (
-                        notifications.slice(0, 10).map((n: Notification) => {
-                          const dotColor = n.severity === 'error' ? 'bg-red-400' :
-                            n.severity === 'warning' ? 'bg-yellow-400' :
-                            n.severity === 'success' ? 'bg-emerald-400' : 'bg-blue-400';
+                        groupedNotifications.map((entry) => {
+                          if (entry.key === null) {
+                            // Standalone notification (no group)
+                            const n = (entry as { key: null; item: Notification }).item;
+                            const dotColor = n.severity === 'error' ? 'bg-red-400' :
+                              n.severity === 'warning' ? 'bg-yellow-400' :
+                              n.severity === 'success' ? 'bg-emerald-400' : 'bg-blue-400';
+                            return (
+                              <button
+                                key={n.id}
+                                onClick={() => { if (!n.read) markRead.mutate(n.id); }}
+                                className={`flex w-full items-start gap-2.5 px-4 py-2.5 text-left transition-colors hover:bg-white/50 dark:hover:bg-white/[0.06] ${n.read ? 'opacity-50' : ''}`}
+                              >
+                                <div className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dotColor}`} />
+                                <div className="flex-1 min-w-0">
+                                  <p className="truncate text-xs text-gray-900 dark:text-white">{n.message}</p>
+                                  <p className="mt-0.5 text-[10px] text-gray-400 dark:text-white/25">
+                                    {n.severity} &middot; {n.eventType} &middot; {timeAgo(n.createdAt)}
+                                  </p>
+                                </div>
+                              </button>
+                            );
+                          }
+
+                          // Grouped notification
+                          const g = entry as { key: string; title: string; items: Notification[] };
+                          const isExpanded = expandedGroups.has(g.key);
+                          const worstSeverity = g.items.some((i) => i.severity === 'error') ? 'error'
+                            : g.items.some((i) => i.severity === 'warning') ? 'warning'
+                            : g.items.some((i) => i.severity === 'success') ? 'success' : 'info';
+                          const parentDot = worstSeverity === 'error' ? 'bg-red-400' :
+                            worstSeverity === 'warning' ? 'bg-yellow-400' :
+                            worstSeverity === 'success' ? 'bg-emerald-400' : 'bg-blue-400';
+                          const allRead = g.items.every((i) => i.read);
+
                           return (
-                            <button
-                              key={n.id}
-                              onClick={() => { if (!n.read) markRead.mutate(n.id); }}
-                              className={`flex w-full items-start gap-2.5 px-4 py-2.5 text-left transition-colors hover:bg-white/50 dark:hover:bg-white/[0.06] ${n.read ? 'opacity-50' : ''}`}
-                            >
-                              <div className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dotColor}`} />
-                              <div className="flex-1 min-w-0">
-                                <p className="truncate text-xs text-gray-900 dark:text-white">{n.message}</p>
-                                <p className="mt-0.5 text-[10px] text-gray-400 dark:text-white/25">
-                                  {n.eventType} · {timeAgo(n.createdAt)}
-                                </p>
-                              </div>
-                            </button>
+                            <div key={g.key}>
+                              {/* Parent row */}
+                              <button
+                                onClick={() => toggleGroup(g.key)}
+                                className={`flex w-full items-start gap-2.5 px-4 py-2.5 text-left transition-colors hover:bg-white/50 dark:hover:bg-white/[0.06] ${allRead ? 'opacity-50' : ''}`}
+                              >
+                                <div className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${parentDot}`} />
+                                <div className="flex-1 min-w-0">
+                                  <p className="truncate text-xs font-medium text-gray-900 dark:text-white">{g.title}</p>
+                                  <p className="mt-0.5 text-[10px] text-gray-400 dark:text-white/25">
+                                    {g.items.length} event{g.items.length > 1 ? 's' : ''} &middot; {timeAgo(g.items[0]!.createdAt)}
+                                  </p>
+                                </div>
+                                <svg
+                                  viewBox="0 0 24 24"
+                                  className={`mt-1 h-3 w-3 shrink-0 text-gray-400 dark:text-white/25 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth={2}
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <polyline points="6 9 12 15 18 9" />
+                                </svg>
+                              </button>
+
+                              {/* Children with connecting pipe */}
+                              {isExpanded && (
+                                <div className="relative ml-[22px] border-l-2 border-gray-200 dark:border-white/10">
+                                  {g.items.map((n) => {
+                                    const dotColor = n.severity === 'error' ? 'bg-red-400' :
+                                      n.severity === 'warning' ? 'bg-yellow-400' :
+                                      n.severity === 'success' ? 'bg-emerald-400' : 'bg-blue-400';
+                                    return (
+                                      <button
+                                        key={n.id}
+                                        onClick={() => { if (!n.read) markRead.mutate(n.id); }}
+                                        className={`relative flex w-full items-start gap-2.5 py-2 pl-4 pr-4 text-left transition-colors hover:bg-white/50 dark:hover:bg-white/[0.06] ${n.read ? 'opacity-50' : ''}`}
+                                      >
+                                        {/* Horizontal connector from pipe */}
+                                        <div className="absolute left-0 top-[14px] h-px w-3 bg-gray-200 dark:bg-white/10" />
+                                        <div className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${dotColor}`} />
+                                        <div className="flex-1 min-w-0">
+                                          <p className="truncate text-[11px] text-gray-700 dark:text-white/80">{n.message}</p>
+                                          <p className="mt-0.5 text-[10px] text-gray-400 dark:text-white/25">
+                                            {n.severity} &middot; {n.eventType} &middot; {timeAgo(n.createdAt)}
+                                          </p>
+                                        </div>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
                           );
                         })
                       )}

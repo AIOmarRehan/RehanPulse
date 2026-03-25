@@ -93,7 +93,7 @@ export async function fetchRecentCommits(
   repos: GitHubRepo[],
   limit = 30,
 ): Promise<GitHubCommit[]> {
-  const topRepos = repos.slice(0, 5);
+  const topRepos = repos.slice(0, 15);
 
   // Get start of current week (Monday 00:00 UTC) for weekly timeline accuracy
   const now = new Date();
@@ -113,7 +113,7 @@ export async function fetchRecentCommits(
         owner,
         repo: repoName,
         since,
-        per_page: 20,
+        per_page: 30,
       });
 
       for (const c of data) {
@@ -142,7 +142,7 @@ export async function fetchOpenPRs(
   repos: GitHubRepo[],
   limit = 10,
 ): Promise<GitHubPR[]> {
-  const topRepos = repos.slice(0, 10);
+  const topRepos = repos.slice(0, 20);
 
   const allPRs: GitHubPR[] = [];
 

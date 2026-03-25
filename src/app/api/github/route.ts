@@ -12,7 +12,7 @@ import {
 
 /* Simple in-memory cache */
 const cache = new Map<string, { data: unknown; ts: number }>();
-const CACHE_TTL = 2 * 60_000; // 2 minutes
+const CACHE_TTL = 30_000; // 30 seconds
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     const cached = cache.get(uid);
     if (!forceRefresh && cached && Date.now() - cached.ts < CACHE_TTL) {
       return NextResponse.json(cached.data, {
-        headers: { 'Cache-Control': 'private, s-maxage=60, stale-while-revalidate=120' },
+        headers: { 'Cache-Control': 'private, no-cache, no-store, must-revalidate' },
       });
     }
 
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
       payload,
       {
         headers: {
-          'Cache-Control': 'private, s-maxage=60, stale-while-revalidate=120',
+          'Cache-Control': 'private, no-cache, no-store, must-revalidate',
         },
       },
     );

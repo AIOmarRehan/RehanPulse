@@ -12,7 +12,7 @@ interface GitHubData {
 }
 
 async function fetchGitHubData(): Promise<GitHubData> {
-  const res = await fetch('/api/github');
+  const res = await fetch('/api/github', { cache: 'no-store' });
   if (!res.ok) {
     throw new Error(`GitHub API failed: ${res.status}`);
   }
@@ -20,7 +20,7 @@ async function fetchGitHubData(): Promise<GitHubData> {
 }
 
 async function forceRefreshGitHubData(): Promise<GitHubData> {
-  const res = await fetch('/api/github?force=1');
+  const res = await fetch('/api/github?force=1', { cache: 'no-store' });
   if (!res.ok) {
     throw new Error(`GitHub API failed: ${res.status}`);
   }
@@ -37,14 +37,16 @@ export function useGitHubData() {
   const query = useQuery({
     queryKey: ['github-data'],
     queryFn: fetchGitHubData,
-    staleTime: 2 * 60_000,
-    refetchInterval: 5 * 60_000,
+    staleTime: 30_000,
+    refetchInterval: 2 * 60_000,
     retry: 1,
   });
 
   const refresh = useCallback(async () => {
     const freshData = await forceRefreshGitHubData();
     queryClient.setQueryData(['github-data'], freshData);
+    // Reset the stale timer so React Query treats this as fully fresh
+    await queryClient.invalidateQueries({ queryKey: ['github-data'], refetchType: 'none' });
   }, [queryClient]);
 
   return { ...query, refresh };

@@ -33,6 +33,11 @@ export const useEventStore = create<EventStoreState>((set) => ({
     set((state) => {
       // Deduplicate by id
       if (state.events.some((e) => e.id === event.id)) return state;
+      // Skip events older than 24 hours
+      if (event.createdAt) {
+        const age = Date.now() - new Date(event.createdAt).getTime();
+        if (age > 24 * 60 * 60 * 1000) return state;
+      }
       // Keep the latest 100 events
       const updated = [event, ...state.events].slice(0, 100);
       return { events: updated };

@@ -494,9 +494,11 @@ export function DashboardContent({ userName }: { userName?: string }) {
   const { data, isLoading, refresh } = useGitHubData();
   const { data: vercelData, isLoading: vercelLoading, error: vercelError } = useVercelData();
   const [refreshing, setRefreshing] = useState(false);
+  const clearEvents = useEventStore((s) => s.clearEvents);
 
   const handleRefresh = async () => {
     setRefreshing(true);
+    clearEvents();
     try { await refresh(); } catch { /* ignore */ }
     finally { setRefreshing(false); }
   };
@@ -581,9 +583,11 @@ function WidgetSkeleton() {
 export function GitHubContent() {
   const { data, isLoading, error, refresh } = useGitHubData();
   const [refreshing, setRefreshing] = useState(false);
+  const clearEvents = useEventStore((s) => s.clearEvents);
 
   const handleRefresh = async () => {
     setRefreshing(true);
+    clearEvents();
     try { await refresh(); } catch { /* ignore */ }
     finally { setRefreshing(false); }
   };

@@ -11,7 +11,7 @@ interface VercelData {
 
 async function fetchVercelData(limit?: number): Promise<VercelData> {
   const url = limit ? `/api/vercel?limit=${limit}` : '/api/vercel';
-  const res = await fetch(url);
+  const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) {
     throw new Error(`Vercel API failed: ${res.status}`);
   }
@@ -26,8 +26,8 @@ export function useVercelData(limit?: number) {
   return useQuery({
     queryKey: ['vercel-data', limit ?? 10],
     queryFn: () => fetchVercelData(limit),
-    staleTime: 5 * 60_000,
-    refetchInterval: 10 * 60_000,
+    staleTime: 30_000,
+    refetchInterval: 2 * 60_000,
     retry: 1,
   });
 }

@@ -84,7 +84,27 @@ export async function POST(request: NextRequest) {
 
     // Write to Firestore via Admin SDK (bypasses security rules)
     const db = getAdminDb();
-    await db.collection('webhook_events').add(event);
+
+    // Look up which user owns this repo to associate the event with them
+    let eventUid: string | null = null;
+    if (event.repo) {
+      const repoOwner = event.repo.split('/')[0];
+      if (repoOwner) {
+        const usersSnap = await db
+          .collection('users')
+          .where('githubLogin', '==', repoOwner)
+          .limit(1)
+          .get();
+        if (!usersSnap.empty) {
+          eventUid = usersSnap.docs[0]!.id;
+        }
+      }
+    }
+
+    await db.collection('webhook_events').add({
+      ...event,
+      ...(eventUid ? { uid: eventUid } : {}),
+    });
 
     // ── Alert evaluation: check rules and create notifications ──
     await evaluateAlertRules(db, event);

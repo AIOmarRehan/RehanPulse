@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase-admin';
+import { decrypt } from '@/lib/crypto';
 
 export const revalidate = 60;
 
+/**
+ * GET /api/firebase — fetch Firestore data from the user's selected Firebase project.
+ * Uses their stored Google OAuth token + the Firestore REST API.
+ */
 export async function GET(request: NextRequest) {
   try {
     const session = request.cookies.get('__session')?.value;
@@ -10,71 +15,103 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const adminAuth = getAdminAuth();
-    await adminAuth.verifySessionCookie(session, true);
+    const decoded = await getAdminAuth().verifySessionCookie(session, true);
+    const doc = await getAdminDb().collection('users').doc(decoded.uid).get();
+    const data = doc.data();
 
-    const db = getAdminDb();
+    if (!data?.googleTokenEncrypted) {
+      return NextResponse.json({ error: 'Google account not connected' }, { status: 400 });
+    }
 
-    // List top-level collections and count documents in each
-    const collectionsRef = await db.listCollections();
+    const projectId =
+      (new URL(request.url).searchParams.get('project')) ||
+      (data.firebaseSelectedProject as string | undefined);
+
+    if (!projectId) {
+      return NextResponse.json({ error: 'No project selected' }, { status: 400 });
+    }
+
+    const token = decrypt(data.googleTokenEncrypted as string);
+    const base = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents`;
+
+    // 1. List collection IDs
+    const colRes = await fetch(`${base}:listCollectionIds`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+
+    if (!colRes.ok) {
+      const status = colRes.status;
+      if (status === 401 || status === 403) {
+        return NextResponse.json(
+          { error: 'Token expired or access denied. Please reconnect Google.' },
+          { status: 401 },
+        );
+      }
+      if (status === 404) {
+        return NextResponse.json(
+          { error: 'Firestore not enabled on this project.' },
+          { status: 404 },
+        );
+      }
+      return NextResponse.json(
+        { error: `Failed to list collections (${status})` },
+        { status: 502 },
+      );
+    }
+
+    const colBody = (await colRes.json()) as { collectionIds?: string[] };
+    const collectionIds = colBody.collectionIds ?? [];
+
+    // 2. Count documents in each collection (parallel, max 10)
     const collections = await Promise.all(
-      collectionsRef.map(async (col) => {
-        const snapshot = await col.count().get();
-        return { name: col.id, docs: snapshot.data().count };
+      collectionIds.slice(0, 20).map(async (colId) => {
+        try {
+          const countRes = await fetch(`${base}:runAggregationQuery`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              structuredAggregationQuery: {
+                structuredQuery: {
+                  from: [{ collectionId: colId }],
+                },
+                aggregations: [{ alias: 'count', count: {} }],
+              },
+            }),
+          });
+
+          if (countRes.ok) {
+            const countBody = (await countRes.json()) as Array<{
+              result?: { aggregateFields?: { count?: { integerValue?: string } } };
+            }>;
+            const count = parseInt(
+              countBody[0]?.result?.aggregateFields?.count?.integerValue ?? '0',
+              10,
+            );
+            return { name: colId, docs: count };
+          }
+          return { name: colId, docs: 0 };
+        } catch {
+          return { name: colId, docs: 0 };
+        }
       }),
     );
 
-    // Get recent webhook events to compute daily activity
-    const now = new Date();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-    const eventsSnap = await db
-      .collection('webhook_events')
-      .where('createdAt', '>=', sevenDaysAgo.toISOString())
-      .orderBy('createdAt', 'desc')
-      .limit(500)
-      .get();
-
-    // Bucket events by day-of-week for 7-day chart
-    const dailyActivity: { date: string; events: number }[] = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
-      dailyActivity.push({
-        date: d.toLocaleDateString('en-US', { weekday: 'short' }),
-        events: 0,
-      });
-    }
-
-    for (const doc of eventsSnap.docs) {
-      const data = doc.data();
-      const eventDate = new Date(data.createdAt as string);
-      const daysAgo = Math.floor((now.getTime() - eventDate.getTime()) / (24 * 60 * 60 * 1000));
-      const idx = 6 - daysAgo;
-      if (idx >= 0 && idx < 7) {
-        dailyActivity[idx]!.events++;
-      }
-    }
-
-    // Get user count
-    const usersCount = collections.find((c) => c.name === 'users')?.docs ?? 0;
-
-    // Auth - list recent users (limited)
-    const usersResult = await adminAuth.listUsers(10);
-    const recentAuthEvents = usersResult.users.length;
-
-    // Compute totals
     const totalDocs = collections.reduce((sum, c) => sum + c.docs, 0);
-    const totalWebhookEvents = eventsSnap.size;
 
     return NextResponse.json({
+      projectId,
       collections,
-      dailyActivity,
       stats: {
+        totalCollections: collections.length,
         totalDocs,
-        totalWebhookEvents,
-        usersCount,
-        recentAuthEvents,
       },
     });
   } catch (error) {

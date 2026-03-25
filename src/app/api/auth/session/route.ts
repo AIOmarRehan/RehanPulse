@@ -28,9 +28,25 @@ export async function POST(request: NextRequest) {
     // If we have a GitHub access token, encrypt and store it
     if (githubAccessToken) {
       const encryptedToken = encrypt(githubAccessToken);
+
+      // Fetch GitHub username to associate webhook events with this user
+      let githubLogin: string | null = null;
+      try {
+        const ghRes = await fetch('https://api.github.com/user', {
+          headers: { Authorization: `Bearer ${githubAccessToken}`, Accept: 'application/json' },
+        });
+        if (ghRes.ok) {
+          const ghUser = (await ghRes.json()) as { login?: string };
+          githubLogin = ghUser.login ?? null;
+        }
+      } catch {
+        // Non-blocking — continue without the login
+      }
+
       await adminDb.collection('users').doc(uid).set(
         {
           githubTokenEncrypted: encryptedToken,
+          ...(githubLogin ? { githubLogin } : {}),
           displayName: decodedToken.name ?? null,
           email: decodedToken.email ?? null,
           photoURL: decodedToken.picture ?? null,

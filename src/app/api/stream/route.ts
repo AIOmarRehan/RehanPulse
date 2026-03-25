@@ -10,9 +10,11 @@ export async function GET(request: NextRequest) {
     return new Response('Unauthorized', { status: 401 });
   }
 
+  let uid: string;
   try {
     const adminAuth = getAdminAuth();
-    await adminAuth.verifySessionCookie(session, true);
+    const decoded = await adminAuth.verifySessionCookie(session, true);
+    uid = decoded.uid;
   } catch {
     return new Response('Unauthorized', { status: 401 });
   }
@@ -33,10 +35,10 @@ export async function GET(request: NextRequest) {
         }
       }, 30_000);
 
-      // Listen for new webhook events (last 50, ordered by creation time)
+      // Listen for new webhook events filtered to this user
       unsubscribe = db
         .collection('webhook_events')
-        .orderBy('createdAt', 'desc')
+        .where('uid', '==', uid)
         .limit(50)
         .onSnapshot(
           (snapshot) => {

@@ -143,6 +143,15 @@ function buildSummary(eventType: string, action: string | undefined, payload: un
       const conclusion = cr?.conclusion as string | undefined;
       return `CI: ${name ?? 'check'} — ${conclusion ?? action ?? 'running'}`;
     }
+    case 'workflow_run': {
+      const wr = p.workflow_run as Record<string, unknown> | undefined;
+      const name = wr?.name as string | undefined;
+      const conclusion = wr?.conclusion as string | undefined;
+      if (action === 'completed' && conclusion) {
+        return `CI: ${name ?? 'workflow'} — ${conclusion}`;
+      }
+      return `CI: ${name ?? 'workflow'} — ${action ?? 'running'}`;
+    }
     default:
       return `${eventType}${action ? `: ${action}` : ''}`;
   }
@@ -169,8 +178,13 @@ async function evaluateAlertRules(
       const rule = ruleDoc.data() as { uid: string; name: string; eventType: string };
 
       // Determine severity based on event type
+      const ciSeverity = event.summary.includes('— failure') || event.summary.includes('— timed_out') || event.summary.includes('— cancelled')
+        ? 'error'
+        : event.summary.includes('— success')
+          ? 'success'
+          : 'info';
       const severity = event.type === 'deployment' ? 'warning' :
-        event.type === 'ci' ? 'info' :
+        event.type === 'ci' ? ciSeverity :
         event.type === 'push' ? 'info' :
         event.type === 'pr_opened' ? 'info' :
         event.type === 'pr_closed' ? 'success' : 'info';

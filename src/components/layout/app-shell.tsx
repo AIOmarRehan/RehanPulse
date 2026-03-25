@@ -74,7 +74,17 @@ export function AppShell() {
     requestAnimationFrame(() => { hasMounted.current = true; });
   }, []);
 
+  // Auto-close sidebar on mobile
+  useEffect(() => {
+    if (window.innerWidth < 768) setSidebarOpen(false);
+  }, []);
+
   const handleCmdOpen = useCallback((v: boolean) => setCmdOpen(v), []);
+
+  const handleNavClick = useCallback((id: NavId) => {
+    setActiveNav(id);
+    if (window.innerWidth < 768) setSidebarOpen(false);
+  }, []);
 
   const spotlightActions = useMemo<SpotlightAction[]>(() => [
     // Navigation
@@ -122,12 +132,22 @@ export function AppShell() {
       {/* Sidebar */}
       <AnimatePresence mode="wait">
         {sidebarOpen && (
+          <>
+          {/* Mobile backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setSidebarOpen(false)}
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm md:hidden"
+          />
           <motion.aside
-            initial={hasMounted.current ? { width: 0, opacity: 0 } : false}
-            animate={{ width: 240, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
+            initial={hasMounted.current ? { x: -240, opacity: 0 } : false}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -240, opacity: 0 }}
             transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-            className="relative z-10 flex flex-col border-r border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)]"
+            className="fixed inset-y-0 left-0 z-50 md:relative md:z-10 flex w-[240px] flex-col border-r border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)]"
           >
             {/* App logo */}
             <div className="flex items-center gap-2 px-5 py-4">
@@ -150,7 +170,7 @@ export function AppShell() {
               {NAV_ITEMS.map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => setActiveNav(item.id)}
+                  onClick={() => handleNavClick(item.id)}
                   className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-all ${
                     activeNav === item.id
                       ? 'bg-white/60 dark:bg-white/[0.10] text-gray-900 dark:text-white shadow-sm'
@@ -223,6 +243,7 @@ export function AppShell() {
               </div>
             )}
           </motion.aside>
+          </>
         )}
       </AnimatePresence>
 

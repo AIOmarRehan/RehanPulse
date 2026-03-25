@@ -21,6 +21,9 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   title: 'RehanPulse',
   description: 'Developer Activity Command Center',
+  verification: {
+    google: 'FCJAuIHyxvPNVxnn1OQjiyrVwnwejWRnY9Ubp8F_yIc',
+  },
 };
 
 // Inline script that removes the loader when the page is truly ready.

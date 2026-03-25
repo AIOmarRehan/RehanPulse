@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { WidgetGrid, type WidgetConfig } from '@/components/widgets/widget-grid';
 import { useGitHubData } from '@/hooks/use-github-data';
 import { useVercelData } from '@/hooks/use-vercel-data';
@@ -1155,10 +1155,54 @@ export function AlertsContent() {
   const [duplicateWarning, setDuplicateWarning] = useState('');
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
   const [editingRuleName, setEditingRuleName] = useState('');
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const rules = rulesData?.rules ?? [];
   const notifications = notifsData?.notifications ?? [];
   const unreadCount = notifications.filter((n: Notification) => !n.read).length;
+
+  const toggleGroup = (key: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  // Group notifications by groupKey — ungrouped items remain standalone
+  type NotifGroup = { key: string; title: string; items: Notification[] } | { key: null; item: Notification };
+  const groupedNotifications = useMemo(() => {
+    const groups: NotifGroup[] = [];
+    const keyMap = new Map<string, { title: string; items: Notification[] }>();
+    const order: (string | Notification)[] = [];
+
+    for (const n of notifications) {
+      if (n.groupKey) {
+        let g = keyMap.get(n.groupKey);
+        if (!g) {
+          g = { title: n.groupTitle ?? n.groupKey, items: [] };
+          keyMap.set(n.groupKey, g);
+          order.push(n.groupKey);
+        }
+        g.items.push(n);
+      } else {
+        order.push(n);
+      }
+    }
+
+    for (const entry of order) {
+      if (typeof entry === 'string') {
+        const g = keyMap.get(entry);
+        if (g && g.items.length > 0) {
+          groups.push({ key: entry, title: g.title, items: g.items });
+          keyMap.delete(entry);
+        }
+      } else {
+        groups.push({ key: null, item: entry });
+      }
+    }
+    return groups;
+  }, [notifications]);
 
   const handleAddRule = () => {
     if (!newRuleName.trim()) return;
@@ -1279,40 +1323,142 @@ export function AlertsContent() {
           </p>
         ) : (
           <div className="space-y-2">
-            {notifications.map((n: Notification, i: number) => {
-              const style = severityStyle[n.severity] ?? severityStyle.info!;
+            {groupedNotifications.map((entry, i) => {
+              if (entry.key === null) {
+                // Standalone notification (no group)
+                const n = (entry as { key: null; item: Notification }).item;
+                const style = severityStyle[n.severity] ?? severityStyle.info!;
+                return (
+                  <motion.div
+                    key={n.id}
+                    {...fadeIn}
+                    transition={{ delay: 0.2 + i * 0.03 }}
+                    className={`flex items-start gap-3 rounded-xl border p-4 ${style.bg} ${n.read ? 'opacity-50' : ''}`}
+                  >
+                    <div className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${style.dot}`} />
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-900 dark:text-white">{n.message}</p>
+                      <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-400 dark:text-white/30">
+                        <span className="capitalize">{n.severity}</span>
+                        <span>&middot;</span>
+                        <span>{n.eventType}</span>
+                        <span>&middot;</span>
+                        <span>{timeAgo(n.createdAt)}</span>
+                        {n.read && (
+                          <>
+                            <span>&middot;</span>
+                            <span className="text-emerald-500 dark:text-emerald-400/70">Read</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    {!n.read && (
+                      <button
+                        onClick={() => markRead.mutate(n.id)}
+                        className="shrink-0 rounded-lg px-2 py-1 text-[10px] text-gray-400 hover:bg-white/40 dark:hover:bg-white/[0.08] transition-colors"
+                      >
+                        Dismiss
+                      </button>
+                    )}
+                  </motion.div>
+                );
+              }
+
+              // Grouped notification
+              const g = entry as { key: string; title: string; items: Notification[] };
+              const isExpanded = expandedGroups.has(g.key);
+              const worstSeverity = g.items.some((x) => x.severity === 'error') ? 'error'
+                : g.items.some((x) => x.severity === 'warning') ? 'warning'
+                : g.items.some((x) => x.severity === 'success') ? 'success' : 'info';
+              const parentStyle = severityStyle[worstSeverity] ?? severityStyle.info!;
+              const allRead = g.items.every((x) => x.read);
+
               return (
                 <motion.div
-                  key={n.id}
+                  key={g.key}
                   {...fadeIn}
                   transition={{ delay: 0.2 + i * 0.03 }}
-                  className={`flex items-start gap-3 rounded-xl border p-4 ${style.bg} ${n.read ? 'opacity-50' : ''}`}
+                  className={`overflow-hidden rounded-xl border ${parentStyle.bg}`}
                 >
-                  <div className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${style.dot}`} />
-                  <div className="flex-1">
-                    <p className="text-sm text-gray-900 dark:text-white">{n.message}</p>
-                    <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-400 dark:text-white/30">
-                      <span className="capitalize">{n.severity}</span>
-                      <span>·</span>
-                      <span>{n.eventType}</span>
-                      <span>·</span>
-                      <span>{timeAgo(n.createdAt)}</span>
-                      {n.read && (
-                        <>
-                          <span>·</span>
-                          <span className="text-emerald-500 dark:text-emerald-400/70">Read</span>
-                        </>
-                      )}
+                  {/* Parent row */}
+                  <button
+                    onClick={() => toggleGroup(g.key)}
+                    className={`flex w-full items-start gap-3 p-4 text-left transition-colors hover:bg-white/30 dark:hover:bg-white/[0.04] ${allRead ? 'opacity-50' : ''}`}
+                  >
+                    <div className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${parentStyle.dot}`} />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">{g.title}</p>
+                      <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-400 dark:text-white/30">
+                        <span>{g.items.length} event{g.items.length > 1 ? 's' : ''}</span>
+                        <span>&middot;</span>
+                        <span>{timeAgo(g.items[0]!.createdAt)}</span>
+                      </div>
                     </div>
-                  </div>
-                  {!n.read && (
-                    <button
-                      onClick={() => markRead.mutate(n.id)}
-                      className="shrink-0 rounded-lg px-2 py-1 text-[10px] text-gray-400 hover:bg-white/40 dark:hover:bg-white/[0.08] transition-colors"
+                    <svg
+                      viewBox="0 0 24 24"
+                      className={`mt-1 h-4 w-4 shrink-0 text-gray-400 dark:text-white/25 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     >
-                      Dismiss
-                    </button>
-                  )}
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
+
+                  {/* Children with connecting pipe */}
+                  <AnimatePresence>
+                    {isExpanded && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="relative ml-6 border-l-2 border-gray-200 dark:border-white/10 pb-1">
+                          {g.items.map((n) => {
+                            const childStyle = severityStyle[n.severity] ?? severityStyle.info!;
+                            return (
+                              <div
+                                key={n.id}
+                                className={`relative flex items-start gap-3 py-3 pl-5 pr-4 transition-colors hover:bg-white/30 dark:hover:bg-white/[0.04] ${n.read ? 'opacity-50' : ''}`}
+                              >
+                                {/* Horizontal connector from pipe */}
+                                <div className="absolute left-0 top-[18px] h-px w-4 bg-gray-200 dark:bg-white/10" />
+                                <div className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${childStyle.dot}`} />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm text-gray-700 dark:text-white/80">{n.message}</p>
+                                  <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-400 dark:text-white/30">
+                                    <span className="capitalize">{n.severity}</span>
+                                    <span>&middot;</span>
+                                    <span>{n.eventType}</span>
+                                    <span>&middot;</span>
+                                    <span>{timeAgo(n.createdAt)}</span>
+                                    {n.read && (
+                                      <>
+                                        <span>&middot;</span>
+                                        <span className="text-emerald-500 dark:text-emerald-400/70">Read</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                                {!n.read && (
+                                  <button
+                                    onClick={() => markRead.mutate(n.id)}
+                                    className="shrink-0 rounded-lg px-2 py-1 text-[10px] text-gray-400 hover:bg-white/40 dark:hover:bg-white/[0.08] transition-colors"
+                                  >
+                                    Dismiss
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </motion.div>
               );
             })}

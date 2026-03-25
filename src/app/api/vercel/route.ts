@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminAuth } from '@/lib/firebase-admin';
 import { fetchDeployments, fetchProjects, fetchUsage } from '@/lib/vercel';
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 /* Simple in-memory cache: avoids re-calling slow Vercel APIs on every request */
 const cache = new Map<string, { data: unknown; ts: number }>();

@@ -8,6 +8,7 @@ import {
 } from '@/lib/github';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 /**
  * GET /api/cron/sync — Background sync for all users.

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminAuth } from '@/lib/firebase-admin';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 import {
   getOctokitForUser,
   fetchUserRepos,

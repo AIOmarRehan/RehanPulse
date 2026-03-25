@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { getAdminDb } from '@/lib/firebase-admin';
+import type { Firestore } from 'firebase-admin/firestore';
 
 /** Verify GitHub webhook X-Hub-Signature-256 HMAC. */
 function verifySignature(payload: string, signature: string | null, secret: string): boolean {
@@ -85,6 +86,9 @@ export async function POST(request: NextRequest) {
     const db = getAdminDb();
     await db.collection('webhook_events').add(event);
 
+    // ── Alert evaluation: check rules and create notifications ──
+    await evaluateAlertRules(db, event);
+
     return NextResponse.json({ received: true, event: event.type });
   } catch (error) {
     console.error('Webhook processing error:', error);
@@ -120,5 +124,50 @@ function buildSummary(eventType: string, action: string | undefined, payload: un
     }
     default:
       return `${eventType}${action ? `: ${action}` : ''}`;
+  }
+}
+
+/** Evaluate alert rules against a new event and create notifications for matching rules. */
+async function evaluateAlertRules(
+  db: Firestore,
+  event: { type: string; summary: string; createdAt: string },
+) {
+  try {
+    // Find all enabled rules that match this event type
+    const rulesSnap = await db
+      .collection('alert_rules')
+      .where('enabled', '==', true)
+      .where('eventType', '==', event.type)
+      .get();
+
+    if (rulesSnap.empty) return;
+
+    const batch = db.batch();
+
+    for (const ruleDoc of rulesSnap.docs) {
+      const rule = ruleDoc.data() as { uid: string; name: string; eventType: string };
+
+      // Determine severity based on event type
+      const severity = event.type === 'deployment' ? 'warning' :
+        event.type === 'ci' ? 'info' :
+        event.type === 'push' ? 'info' :
+        event.type === 'pr_opened' ? 'info' :
+        event.type === 'pr_closed' ? 'success' : 'info';
+
+      const notifRef = db.collection('notifications').doc();
+      batch.set(notifRef, {
+        uid: rule.uid,
+        severity,
+        message: `[${rule.name}] ${event.summary}`,
+        eventType: event.type,
+        read: false,
+        createdAt: event.createdAt,
+      });
+    }
+
+    await batch.commit();
+  } catch (error) {
+    // Don't fail the webhook response if alert evaluation fails
+    console.error('Alert evaluation error:', error);
   }
 }

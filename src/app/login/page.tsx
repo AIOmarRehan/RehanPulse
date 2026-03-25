@@ -5,11 +5,16 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { motion } from 'framer-motion';
-import { AnimatedBackground } from '@/components/ui/animated-background';
+import dynamic from 'next/dynamic';
+
+const AnimatedBackground = dynamic(
+  () => import('@/components/ui/animated-background').then((m) => m.AnimatedBackground),
+  { ssr: false }
+);
 
 function MacOSSpinner() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-[#0a0a1a]">
+    <div className="flex min-h-screen items-center justify-center bg-[#f0f4ff] dark:bg-[#050608]">
       <div className="relative h-8 w-8">
         {Array.from({ length: 12 }).map((_, i) => (
           <div
@@ -93,14 +98,28 @@ function LoginContent() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gray-50 dark:bg-[#0a0a1a]">
-      {mounted && theme === 'dark' && <AnimatedBackground />}
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#f0f4ff] dark:bg-[#050608]">
+      {mounted && <AnimatedBackground />}
+
+      {/* Back to home link */}
+      {mounted && (
+        <a
+          href="/home"
+          className="absolute left-6 top-6 z-20 flex items-center gap-2 rounded-full border border-white/[0.85] dark:border-white/[0.12] bg-white/55 dark:bg-[#0c0c1d]/80 backdrop-blur-[28px] px-4 py-2 text-xs font-medium text-gray-600 dark:text-white/60 shadow-[0_4px_20px_rgba(100,120,200,0.08)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.2)] transition-all hover:bg-white/80 dark:hover:bg-white/[0.12] hover:text-gray-900 dark:hover:text-white/90"
+        >
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12" />
+            <polyline points="12 19 5 12 12 5" />
+          </svg>
+          Back to Home
+        </a>
+      )}
 
       {/* Theme toggle */}
       {mounted && (
         <button
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          className="absolute right-6 top-6 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] text-gray-500 dark:text-white/50 backdrop-blur-md transition-all hover:bg-gray-100 dark:hover:bg-white/[0.1] hover:text-gray-700 dark:hover:text-white/80"
+          className="absolute right-6 top-6 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.85] dark:border-white/[0.12] bg-white/55 dark:bg-[#0c0c1d]/80 text-gray-500 dark:text-white/50 backdrop-blur-[28px] shadow-[0_4px_20px_rgba(100,120,200,0.08)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.2)] transition-all hover:bg-white/80 dark:hover:bg-white/[0.12] hover:text-gray-700 dark:hover:text-white/80"
           aria-label="Toggle theme"
         >
           {theme === 'dark' ? (
@@ -136,9 +155,9 @@ function LoginContent() {
         className="relative z-10 w-full max-w-md px-6"
       >
         {/* macOS window chrome */}
-        <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-white/[0.08] bg-white/90 dark:bg-white/[0.04] shadow-xl shadow-gray-200/50 dark:shadow-black/40 backdrop-blur-xl">
+        <div className="overflow-hidden rounded-2xl border border-white/[0.85] dark:border-white/[0.12] bg-white/55 dark:bg-[#0c0c1d]/80 shadow-[0_8px_32px_rgba(100,120,200,0.14),inset_0_1px_0_rgba(255,255,255,0.95)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-[28px] backdrop-saturate-[180%]">
           {/* Title bar */}
-          <div className="flex items-center gap-2 border-b border-gray-200 dark:border-white/[0.06] px-4 py-3">
+          <div className="flex items-center gap-2 border-b border-white/[0.18] dark:border-white/[0.06] px-4 py-3">
             <div className="h-3 w-3 rounded-full bg-[#ff5f57]" />
             <div className="h-3 w-3 rounded-full bg-[#febc2e]" />
             <div className="h-3 w-3 rounded-full bg-[#28c840]" />
@@ -197,7 +216,7 @@ function LoginContent() {
               <button
                 onClick={handleSignIn}
                 disabled={signingIn || redirecting}
-                className="group relative flex w-full items-center justify-center gap-3 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] px-6 py-3.5 text-sm font-medium text-gray-900 dark:text-white transition-all hover:border-gray-300 dark:hover:border-white/[0.15] hover:bg-gray-50 dark:hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
+                className="group relative flex w-full items-center justify-center gap-3 rounded-xl border border-white/[0.85] dark:border-white/[0.12] bg-white/60 dark:bg-[#0c0c1d]/80 backdrop-blur-[28px] px-6 py-3.5 text-sm font-medium text-gray-900 dark:text-white shadow-[0_4px_20px_rgba(100,120,200,0.08)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.2)] transition-all hover:bg-white/80 dark:hover:bg-white/[0.12] hover:border-white dark:hover:border-white/[0.2] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {signingIn ? (
                   <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 dark:border-white/20 border-t-gray-900 dark:border-t-white" />
@@ -233,7 +252,7 @@ function LoginContent() {
               ].map((item) => (
                 <div
                   key={item.label}
-                  className="flex flex-col items-center gap-1.5 rounded-lg border border-gray-200 dark:border-white/[0.06] bg-gray-50 dark:bg-white/[0.02] px-2 py-3 text-center"
+                  className="flex flex-col items-center gap-1.5 rounded-lg border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[20px] px-2 py-3 text-center"
                 >
                   <span className="text-lg">{item.icon}</span>
                   <span className="text-[10px] font-medium text-gray-500 dark:text-white/40">
@@ -245,7 +264,7 @@ function LoginContent() {
           </div>
 
           {/* Footer */}
-          <div className="border-t border-gray-200 dark:border-white/[0.06] px-8 py-4">
+          <div className="border-t border-white/[0.18] dark:border-white/[0.06] px-8 py-4">
             <p className="text-center text-[10px] text-gray-400 dark:text-white/25">
               Built with Next.js, Firebase & Tailwind CSS
             </p>

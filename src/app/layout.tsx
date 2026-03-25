@@ -51,7 +51,7 @@ export default function RootLayout({
         <div
           id="__app-loader"
           aria-hidden="true"
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-gray-50 dark:bg-[#0a0a1a]"
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#f0f4ff] dark:bg-[#050608]"
           style={{ transition: 'opacity 0.4s ease-out' }}
         >
           <div className="relative h-8 w-8">

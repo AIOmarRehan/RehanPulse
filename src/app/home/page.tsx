@@ -4,16 +4,57 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, useScroll, useTransform, useInView, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { useRouter } from 'next/navigation';
-import { AnimatedBackground } from '@/components/ui/animated-background';
+import dynamic from 'next/dynamic';
+
+const AnimatedBackground = dynamic(
+  () => import('@/components/ui/animated-background').then((m) => m.AnimatedBackground),
+  { ssr: false }
+);
 
 /* ─── Animation Presets ─── */
 const ease = [0.22, 1, 0.36, 1] as const;
-const fadeUp = {
-  initial: { opacity: 0, y: 24 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.5, ease },
-};
 const stagger = { animate: { transition: { staggerChildren: 0.08 } } };
+
+/* ─── Auto-typing Sentences ─── */
+const HERO_SENTENCES: [string, string][] = [
+  ['Every commit. Every deploy.', ' One command center.'],
+  ['Know exactly what your code is doing', ' — in real time.'],
+  ['All your developer signals.', ' One real-time dashboard.'],
+  ['From GitHub to production', ' — fully visible.'],
+  ['Your codebase,', ' live and fully observable.'],
+];
+
+function useTypewriter(sentences: [string, string][], typingSpeed = 45, deletingSpeed = 25, pauseTime = 2200) {
+  const [sentenceIndex, setSentenceIndex] = useState(0);
+  const [charIndex, setCharIndex] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const fullText = sentences[sentenceIndex]![0] + sentences[sentenceIndex]![1];
+  const splitPoint = sentences[sentenceIndex]![0].length;
+
+  useEffect(() => {
+    if (!isDeleting && charIndex === fullText.length) {
+      const timeout = setTimeout(() => setIsDeleting(true), pauseTime);
+      return () => clearTimeout(timeout);
+    }
+    if (isDeleting && charIndex === 0) {
+      setIsDeleting(false);
+      setSentenceIndex((prev) => (prev + 1) % sentences.length);
+      return;
+    }
+    const speed = isDeleting ? deletingSpeed : typingSpeed;
+    const timeout = setTimeout(() => {
+      setCharIndex((prev) => prev + (isDeleting ? -1 : 1));
+    }, speed);
+    return () => clearTimeout(timeout);
+  }, [charIndex, isDeleting, fullText.length, sentences.length, typingSpeed, deletingSpeed, pauseTime]);
+
+  const displayed = fullText.slice(0, charIndex);
+  const firstPart = displayed.slice(0, Math.min(charIndex, splitPoint));
+  const secondPart = charIndex > splitPoint ? displayed.slice(splitPoint) : '';
+
+  return { firstPart, secondPart };
+}
 
 /* ─── Cursor Glow Hook ─── */
 function useCursorGlow(ref: React.RefObject<HTMLElement | null>) {
@@ -43,13 +84,13 @@ function DemoSlide({ tab }: { tab: typeof DEMO_TABS[number] }) {
           { label: 'Open PRs', value: '3', color: 'text-emerald-400' },
           { label: 'Deployments', value: '7', color: 'text-blue-400' },
         ].map((s) => (
-          <div key={s.label} className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
+          <div key={s.label} className="rounded-xl bg-gray-100/80 dark:bg-white/[0.04] border border-gray-200/60 dark:border-white/[0.06] p-3">
             <p className={`text-xl font-semibold ${s.color}`}>{s.value}</p>
-            <p className="text-[10px] text-white/30">{s.label}</p>
+            <p className="text-[10px] text-gray-400 dark:text-white/30">{s.label}</p>
           </div>
         ))}
-        <div className="col-span-2 rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
-          <p className="text-[10px] font-semibold text-white/40 mb-2">Activity</p>
+        <div className="col-span-2 rounded-xl bg-gray-100/80 dark:bg-white/[0.04] border border-gray-200/60 dark:border-white/[0.06] p-3">
+          <p className="text-[10px] font-semibold text-gray-400 dark:text-white/40 mb-2">Activity</p>
           <div className="flex items-end gap-1.5 h-16">
             {[40, 65, 50, 80, 45, 70, 90].map((h, i) => (
               <motion.div
@@ -62,9 +103,9 @@ function DemoSlide({ tab }: { tab: typeof DEMO_TABS[number] }) {
             ))}
           </div>
         </div>
-        <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
+        <div className="rounded-xl bg-gray-100/80 dark:bg-white/[0.04] border border-gray-200/60 dark:border-white/[0.06] p-3">
           <p className={`text-xl font-semibold text-amber-400`}>98.2%</p>
-          <p className="text-[10px] text-white/30">Success Rate</p>
+          <p className="text-[10px] text-gray-400 dark:text-white/30">Success Rate</p>
         </div>
       </div>
     );
@@ -78,10 +119,10 @@ function DemoSlide({ tab }: { tab: typeof DEMO_TABS[number] }) {
           { sha: 'i7j8k9l', msg: 'chore: update deps', time: '1d ago', repo: 'portfolio' },
           { sha: 'm0n1o2p', msg: 'feat: dark mode support', time: '2d ago', repo: 'RehanPulse' },
         ].map((c) => (
-          <div key={c.sha} className="flex items-center gap-3 rounded-lg bg-white/[0.04] border border-white/[0.06] px-3 py-2">
+          <div key={c.sha} className="flex items-center gap-3 rounded-lg bg-gray-100/80 dark:bg-white/[0.04] border border-gray-200/60 dark:border-white/[0.06] px-3 py-2">
             <span className="font-mono text-[10px] text-indigo-400">{c.sha}</span>
-            <span className="truncate text-xs text-white/60">{c.msg}</span>
-            <span className="ml-auto shrink-0 text-[10px] text-white/25">{c.repo} · {c.time}</span>
+            <span className="truncate text-xs text-gray-600 dark:text-white/60">{c.msg}</span>
+            <span className="ml-auto shrink-0 text-[10px] text-gray-400 dark:text-white/25">{c.repo} · {c.time}</span>
           </div>
         ))}
       </div>
@@ -95,11 +136,11 @@ function DemoSlide({ tab }: { tab: typeof DEMO_TABS[number] }) {
           { name: 'my-app', state: 'Building', branch: 'feat/widgets', env: 'Preview', time: 'now', dot: 'bg-yellow-400 animate-pulse' },
           { name: 'portfolio', state: 'Ready', branch: 'main', env: 'Production', time: '3h ago', dot: 'bg-emerald-400' },
         ].map((d, i) => (
-          <div key={i} className="flex items-center gap-3 rounded-lg bg-white/[0.04] border border-white/[0.06] px-3 py-2.5">
+          <div key={i} className="flex items-center gap-3 rounded-lg bg-gray-100/80 dark:bg-white/[0.04] border border-gray-200/60 dark:border-white/[0.06] px-3 py-2.5">
             <div className={`h-2 w-2 rounded-full ${d.dot}`} />
             <div className="flex-1 min-w-0">
-              <span className="text-xs font-medium text-white/70">{d.name}</span>
-              <div className="flex gap-2 text-[10px] text-white/30">
+              <span className="text-xs font-medium text-gray-700 dark:text-white/70">{d.name}</span>
+              <div className="flex gap-2 text-[10px] text-gray-400 dark:text-white/30">
                 <span>{d.env}</span><span>·</span><span>{d.branch}</span><span>·</span><span>{d.state}</span><span>·</span><span>{d.time}</span>
               </div>
             </div>
@@ -119,9 +160,9 @@ function DemoSlide({ tab }: { tab: typeof DEMO_TABS[number] }) {
         { label: 'Cache Reads', value: '4.2 MB', color: 'text-cyan-400' },
         { label: 'Plan', value: 'Hobby', color: 'text-purple-400' },
       ].map((m) => (
-        <div key={m.label} className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
+        <div key={m.label} className="rounded-xl bg-gray-100/80 dark:bg-white/[0.04] border border-gray-200/60 dark:border-white/[0.06] p-3">
           <p className={`text-lg font-semibold ${m.color}`}>{m.value}</p>
-          <p className="text-[10px] text-white/30">{m.label}</p>
+          <p className="text-[10px] text-gray-400 dark:text-white/30">{m.label}</p>
         </div>
       ))}
     </div>
@@ -133,16 +174,7 @@ function DashboardPreview() {
   const mouse = useCursorGlow(containerRef);
   const [activeTab, setActiveTab] = useState<typeof DEMO_TABS[number]>('Dashboard');
 
-  // Auto-rotate tabs
-  useEffect(() => {
-    const id = setInterval(() => {
-      setActiveTab((prev) => {
-        const idx = DEMO_TABS.indexOf(prev);
-        return DEMO_TABS[(idx + 1) % DEMO_TABS.length]!;
-      });
-    }, 4000);
-    return () => clearInterval(id);
-  }, []);
+
 
   return (
     <div
@@ -161,23 +193,23 @@ function DashboardPreview() {
         }}
       />
 
-      <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0c0c1d]/80 shadow-2xl shadow-black/40 backdrop-blur-xl">
+      <div className="overflow-hidden rounded-2xl border border-white/[0.85] dark:border-white/[0.08] bg-white/50 dark:bg-[#0c0c1d]/80 shadow-[0_8px_32px_rgba(100,120,200,0.14),inset_0_1px_0_rgba(255,255,255,0.95)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-[28px] backdrop-saturate-[180%]">
         {/* Title bar */}
-        <div className="flex items-center gap-2 border-b border-white/[0.06] px-4 py-3">
+        <div className="flex items-center gap-2 border-b border-white/[0.18] dark:border-white/[0.06] px-4 py-3">
           <div className="h-3 w-3 rounded-full bg-[#ff5f57]" />
           <div className="h-3 w-3 rounded-full bg-[#febc2e]" />
           <div className="h-3 w-3 rounded-full bg-[#28c840]" />
-          <span className="ml-2 text-xs font-medium text-white/30">RehanPulse — Dashboard</span>
+          <span className="ml-2 text-xs font-medium text-gray-400 dark:text-white/30">RehanPulse — Dashboard</span>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 border-b border-white/[0.06] px-4 pt-2">
+        <div className="flex gap-1 border-b border-white/[0.18] dark:border-white/[0.06] px-4 pt-2">
           {DEMO_TABS.map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`relative px-3 py-2 text-xs font-medium transition-colors ${
-                activeTab === tab ? 'text-white' : 'text-white/30 hover:text-white/50'
+                activeTab === tab ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/50'
               }`}
             >
               {tab}
@@ -221,7 +253,7 @@ function FeatureCard({ icon, title, desc, index }: { icon: string; title: string
       ref={cardRef}
       variants={{ initial: { opacity: 0, y: 24 }, animate: { opacity: 1, y: 0, transition: { duration: 0.5, delay: index * 0.08, ease } } }}
       whileHover={{ y: -4, transition: { duration: 0.2 } }}
-      className="group relative overflow-hidden rounded-2xl border border-gray-200 dark:border-white/[0.06] bg-white dark:bg-white/[0.03] p-6 transition-shadow hover:shadow-lg hover:shadow-indigo-500/5"
+      className="group relative overflow-hidden rounded-2xl border border-white/[0.85] dark:border-white/[0.08] bg-white/55 dark:bg-[#0c0c1d]/80 backdrop-blur-[28px] backdrop-saturate-[180%] p-6 shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] transition-shadow hover:shadow-lg hover:shadow-indigo-500/5"
     >
       {/* Cursor light */}
       <div
@@ -274,7 +306,7 @@ function Step({ num, title, desc, isLast }: { num: number; title: string; desc: 
           initial={{ scale: 0 }}
           animate={inView ? { scale: 1 } : {}}
           transition={{ duration: 0.3, delay: 0.1, ease }}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-500/10 dark:bg-indigo-500/20 text-sm font-bold text-indigo-500 dark:text-indigo-400 ring-2 ring-indigo-500/20"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-500/10 dark:bg-indigo-500/30 text-sm font-bold text-indigo-500 dark:text-indigo-300 ring-2 ring-indigo-500/20 dark:ring-indigo-400/40"
         >
           {num}
         </motion.div>
@@ -288,8 +320,10 @@ function Step({ num, title, desc, isLast }: { num: number; title: string; desc: 
         )}
       </div>
       <div className="pb-10">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h3>
-        <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-white/40">{desc}</p>
+        <div className="rounded-xl border border-white/[0.85] dark:border-white/[0.08] bg-white/55 dark:bg-[#0c0c1d]/80 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_4px_20px_rgba(100,120,200,0.08)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.2)] px-5 py-4">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h3>
+          <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-white/40">{desc}</p>
+        </div>
       </div>
     </motion.div>
   );
@@ -305,7 +339,7 @@ function WhyBullet({ text, index }: { text: string; index: number }) {
       initial={{ opacity: 0, x: -16 }}
       animate={inView ? { opacity: 1, x: 0 } : {}}
       transition={{ duration: 0.4, delay: index * 0.1, ease }}
-      className="flex items-center gap-3 text-sm text-gray-600 dark:text-white/50"
+      className="flex items-center gap-3 text-sm text-gray-600 dark:text-white/50 rounded-xl border border-white/[0.85] dark:border-white/[0.08] bg-white/55 dark:bg-[#0c0c1d]/80 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_4px_20px_rgba(100,120,200,0.06)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.15)] px-4 py-3"
     >
       <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-500 dark:text-emerald-400">
         <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
@@ -333,13 +367,15 @@ export default function HomePage() {
 
   const goLogin = useCallback(() => router.push('/login'), [router]);
 
+  const { firstPart, secondPart } = useTypewriter(HERO_SENTENCES);
+
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-gray-50 dark:bg-[#0a0a1a] text-gray-900 dark:text-white">
-      {/* Animated smoke background (dark mode) */}
-      {mounted && theme === 'dark' && <AnimatedBackground />}
+    <div className="relative min-h-screen overflow-x-hidden bg-[#f0f4ff] dark:bg-[#050608] text-gray-900 dark:text-white">
+      {/* Three.js particle background (both themes) */}
+      {mounted && <AnimatedBackground />}
 
       {/* ─── Navbar ─── */}
-      <nav className="sticky top-0 z-50 border-b border-gray-200/60 dark:border-white/[0.04] bg-gray-50/80 dark:bg-[#0a0a1a]/80 backdrop-blur-xl">
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/[0.18] dark:border-white/[0.08] bg-white/50 dark:bg-[#0c0c1d]/80 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.06)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25)]" aria-label="Main navigation">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 shadow-sm shadow-indigo-500/25">
@@ -360,7 +396,7 @@ export default function HomePage() {
             {mounted && (
               <button
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] text-gray-500 dark:text-white/50 transition-all hover:bg-gray-100 dark:hover:bg-white/[0.1]"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.85] dark:border-white/[0.12] bg-white/55 dark:bg-[#0c0c1d]/80 text-gray-500 dark:text-white/50 backdrop-blur-[28px] transition-all hover:bg-white/80 dark:hover:bg-white/[0.12]"
                 aria-label="Toggle theme"
               >
                 {theme === 'dark' ? (
@@ -382,12 +418,13 @@ export default function HomePage() {
 
       {/* ─── Hero ─── */}
       <motion.div ref={heroRef} style={{ opacity: heroOpacity, scale: heroScale }}>
-        <section className="relative pb-20 pt-24 sm:pt-32">
+        <section className="relative pb-20 pt-36 sm:pt-44">
           {/* Gradient orbs */}
           <div className="pointer-events-none absolute -left-32 -top-32 h-96 w-96 rounded-full bg-indigo-600/10 dark:bg-indigo-600/15 blur-[120px]" />
           <div className="pointer-events-none absolute -right-32 top-20 h-80 w-80 rounded-full bg-violet-500/10 dark:bg-violet-500/10 blur-[100px]" />
 
           <div className="mx-auto max-w-5xl px-6 text-center">
+            <div className="mx-auto mb-8 max-w-3xl rounded-2xl border border-white/[0.85] dark:border-white/[0.08] bg-white/55 dark:bg-[#0c0c1d]/80 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] px-10 py-8">
             <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease }}>
               <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
                 Your Developer Activity,{' '}
@@ -397,6 +434,18 @@ export default function HomePage() {
               </h1>
             </motion.div>
 
+            {/* Auto-typing sentences */}
+            <div className="mt-4 h-8 flex items-center justify-center">
+              <span className="text-base font-medium text-gray-700 dark:text-white/60 sm:text-lg">
+                {firstPart}
+              </span>
+              {secondPart && <span>&nbsp;</span>}
+              <span className="text-base font-medium sm:text-lg" style={{ color: '#7E5FF4' }}>
+                {secondPart}
+              </span>
+              <span className="ml-0.5 inline-block w-[2px] h-5 bg-[#7E5FF4] animate-pulse" />
+            </div>
+
             <motion.p
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
@@ -405,6 +454,7 @@ export default function HomePage() {
             >
               Track GitHub activity, deployments, and backend metrics in real time — all from one clean, unified dashboard.
             </motion.p>
+            </div>
 
             <motion.div
               initial={{ opacity: 0, y: 12 }}
@@ -423,29 +473,20 @@ export default function HomePage() {
               </button>
               <a
                 href="#demo"
-                className="inline-flex items-center gap-2 rounded-xl border border-gray-300 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] px-6 py-3 text-sm font-medium text-gray-700 dark:text-white/70 transition-all hover:bg-gray-50 dark:hover:bg-white/[0.08] hover:scale-[1.03] active:scale-[0.98]"
+                className="inline-flex items-center gap-2 rounded-xl border border-white/[0.85] dark:border-white/[0.12] bg-white/55 dark:bg-[#0c0c1d]/80 backdrop-blur-[28px] px-6 py-3 text-sm font-medium text-gray-700 dark:text-white/70 transition-all hover:bg-white/80 dark:hover:bg-white/[0.12] hover:scale-[1.03] active:scale-[0.98]"
               >
                 View Demo
               </a>
             </motion.div>
           </div>
 
-          {/* Dashboard preview with parallax */}
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.45, ease }}
-            className="mt-16 px-6"
-          >
-            <DashboardPreview />
-          </motion.div>
         </section>
       </motion.div>
 
       {/* ─── Features ─── */}
       <Section className="py-24" >
         <div id="features" className="scroll-mt-20">
-          <div className="text-center mb-12">
+          <div className="text-center mb-12 mx-auto max-w-2xl rounded-2xl border border-white/[0.85] dark:border-white/[0.08] bg-white/55 dark:bg-[#0c0c1d]/80 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] px-8 py-6">
             <h2 className="text-2xl font-bold sm:text-3xl">Everything you need, <span className="text-indigo-400">in one place</span></h2>
             <p className="mt-3 text-sm text-gray-500 dark:text-white/40">Built for developers who ship fast and want to stay informed.</p>
           </div>
@@ -474,7 +515,7 @@ export default function HomePage() {
       {/* ─── How It Works ─── */}
       <Section className="py-24">
         <div id="how-it-works" className="scroll-mt-20">
-          <div className="text-center mb-12">
+          <div className="text-center mb-12 mx-auto max-w-2xl rounded-2xl border border-white/[0.85] dark:border-white/[0.08] bg-white/55 dark:bg-[#0c0c1d]/80 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] px-8 py-6">
             <h2 className="text-2xl font-bold sm:text-3xl">How it works</h2>
             <p className="mt-3 text-sm text-gray-500 dark:text-white/40">Three steps to full visibility.</p>
           </div>
@@ -495,8 +536,10 @@ export default function HomePage() {
       <Section className="py-24">
         <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
           <div>
-            <h2 className="text-2xl font-bold sm:text-3xl">Why <span className="text-indigo-400">RehanPulse</span>?</h2>
-            <p className="mt-3 text-sm text-gray-500 dark:text-white/40">Focus on building. Let us handle the monitoring.</p>
+            <div className="rounded-2xl border border-white/[0.85] dark:border-white/[0.08] bg-white/55 dark:bg-[#0c0c1d]/80 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] px-8 py-6">
+              <h2 className="text-2xl font-bold sm:text-3xl">Why <span className="text-indigo-400">RehanPulse</span>?</h2>
+              <p className="mt-3 text-sm text-gray-500 dark:text-white/40">Focus on building. Let us handle the monitoring.</p>
+            </div>
             <ul className="mt-8 space-y-4">
               {[
                 'Built for developers who value clarity',
@@ -518,7 +561,7 @@ export default function HomePage() {
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.06, duration: 0.4, ease }}
-                className="rounded-full border border-gray-200 dark:border-white/[0.06] bg-white dark:bg-white/[0.03] px-4 py-2 text-xs font-medium text-gray-600 dark:text-white/50 transition-all hover:border-indigo-400/40 hover:text-indigo-500 dark:hover:text-indigo-400"
+                className="rounded-full border border-white/[0.85] dark:border-white/[0.08] bg-white/55 dark:bg-[#0c0c1d]/80 backdrop-blur-[28px] px-4 py-2 text-xs font-medium text-gray-600 dark:text-white/50 transition-all hover:border-indigo-400/40 hover:text-indigo-500 dark:hover:text-indigo-400"
               >
                 {t}
               </motion.span>
@@ -530,7 +573,7 @@ export default function HomePage() {
       {/* ─── Demo Section ─── */}
       <Section className="py-24">
         <div id="demo" className="scroll-mt-20">
-          <div className="text-center mb-12">
+          <div className="text-center mb-12 mx-auto max-w-2xl rounded-2xl border border-white/[0.85] dark:border-white/[0.08] bg-white/55 dark:bg-[#0c0c1d]/80 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] px-8 py-6">
             <h2 className="text-2xl font-bold sm:text-3xl">See it in action</h2>
             <p className="mt-3 text-sm text-gray-500 dark:text-white/40">See your entire development workflow at a glance.</p>
           </div>
@@ -545,7 +588,7 @@ export default function HomePage() {
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, ease }}
-          className="relative overflow-hidden rounded-3xl border border-gray-200 dark:border-white/[0.06] bg-gradient-to-br from-indigo-500/5 via-transparent to-violet-500/5 dark:from-indigo-500/10 dark:to-violet-500/10 px-8 py-16 text-center"
+          className="relative overflow-hidden rounded-3xl border border-white/[0.85] dark:border-white/[0.08] bg-white/50 dark:bg-[#0c0c1d]/80 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] px-8 py-16 text-center"
         >
           <div className="pointer-events-none absolute -left-20 -top-20 h-60 w-60 rounded-full bg-indigo-500/10 blur-[80px]" />
           <div className="pointer-events-none absolute -bottom-20 -right-20 h-60 w-60 rounded-full bg-violet-500/10 blur-[80px]" />
@@ -570,7 +613,7 @@ export default function HomePage() {
       </Section>
 
       {/* ─── Footer ─── */}
-      <footer className="mt-12 border-t border-gray-200 dark:border-white/[0.04]">
+      <footer className="relative z-10 mt-12 border-t border-white/[0.18] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px]">
         <div className="mx-auto max-w-5xl px-6 py-12">
           <div className="flex flex-col items-center gap-8 sm:flex-row sm:items-start sm:justify-between">
             {/* Brand */}
@@ -607,20 +650,26 @@ export default function HomePage() {
             {/* Social */}
             <div>
               <a
-                href="https://github.com/omar-rei"
+                href="https://github.com/AIOmarRehan/RehanPulse"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 dark:border-white/[0.06] bg-white dark:bg-white/[0.03] px-4 py-2 text-xs text-gray-600 dark:text-white/50 transition-all hover:border-gray-300 dark:hover:border-white/[0.1] hover:text-gray-900 dark:hover:text-white/80"
+                className="inline-flex items-center gap-2 rounded-lg border border-white/[0.85] dark:border-white/[0.08] bg-white/55 dark:bg-[#0c0c1d]/80 backdrop-blur-[28px] px-4 py-2 text-xs text-gray-600 dark:text-white/50 transition-all hover:bg-white/80 dark:hover:bg-white/[0.12] hover:text-gray-900 dark:hover:text-white/80"
               >
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" /></svg>
                 GitHub
               </a>
             </div>
           </div>
+<span className="text-gray-900 dark:text-white/20 tracking-wide hover:text-black dark:hover:text-white/40 transition">
+  Omar Rehan
+</span>
 
-          <div className="mt-10 border-t border-gray-200 dark:border-white/[0.04] pt-6 text-center text-[11px] text-gray-400 dark:text-white/20">
-            Built by <span className="font-medium text-gray-600 dark:text-white/40">Omar Rehan</span>
-          </div>
+<div className="mt-10 border-t border-white/[0.18] dark:border-white/[0.06] pt-6 text-center text-base font-semibold text-gray-400 dark:text-white/20">
+  © 2026 Rehan<span className="text-indigo-400">Pulse</span>. All rights reserved. Developed and maintained by{" "}
+  <span className="text-gray-900 dark:text-white/20 hover:text-black dark:hover:text-white/40 transition-colors duration-300">
+    Omar Rehan
+  </span>
+</div>
         </div>
       </footer>
     </div>

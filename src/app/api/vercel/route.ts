@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminAuth } from '@/lib/firebase-admin';
 import { fetchDeployments, fetchProjects, fetchUsage } from '@/lib/vercel';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60;
 
 export async function GET(request: NextRequest) {
   try {

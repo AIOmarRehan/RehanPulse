@@ -84,11 +84,11 @@ export function CommandPalette({
             className="fixed left-1/2 top-[20%] z-50 w-full max-w-lg -translate-x-1/2"
           >
             <Command
-              className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl shadow-black/20 dark:border-white/[0.08] dark:bg-[#1a1a2e]"
+              className="overflow-hidden rounded-xl border border-white/[0.18] bg-white/70 shadow-2xl shadow-black/20 backdrop-blur-[28px] backdrop-saturate-[180%] dark:border-white/[0.10] dark:bg-white/[0.08] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
               loop
             >
               {/* Search input */}
-              <div className="flex items-center gap-3 border-b border-gray-100 px-4 dark:border-white/[0.06]">
+              <div className="flex items-center gap-3 border-b border-white/[0.18] px-4 dark:border-white/[0.08]">
                 <svg
                   viewBox="0 0 24 24"
                   className="h-4 w-4 shrink-0 text-gray-400 dark:text-white/30"
@@ -107,7 +107,7 @@ export function CommandPalette({
                   placeholder="Type a command or search..."
                   className="flex-1 border-0 bg-transparent py-3.5 text-sm text-gray-900 outline-none placeholder:text-gray-400 dark:text-white dark:placeholder:text-white/30"
                 />
-                <kbd className="hidden rounded-md border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[10px] font-medium text-gray-400 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/30 sm:inline-block">
+                <kbd className="hidden rounded-md border border-white/[0.18] bg-white/60 px-1.5 py-0.5 text-[10px] font-medium text-gray-400 dark:border-white/[0.10] dark:bg-white/[0.06] dark:text-white/30 sm:inline-block">
                   ESC
                 </kbd>
               </div>
@@ -129,7 +129,7 @@ export function CommandPalette({
                         key={action.id}
                         value={`${action.label} ${action.keywords ?? ''}`}
                         onSelect={() => handleSelect(action)}
-                        className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-gray-700 transition-colors data-[selected=true]:bg-gray-100 data-[selected=true]:text-gray-900 dark:text-white/60 dark:data-[selected=true]:bg-white/[0.06] dark:data-[selected=true]:text-white"
+                        className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-gray-700 transition-colors data-[selected=true]:bg-white/60 data-[selected=true]:text-gray-900 dark:text-white/60 dark:data-[selected=true]:bg-white/[0.10] dark:data-[selected=true]:text-white"
                       >
                         <span className="text-base">{action.icon}</span>
                         <span className="flex-1">{action.label}</span>
@@ -140,14 +140,14 @@ export function CommandPalette({
               </Command.List>
 
               {/* Footer */}
-              <div className="flex items-center justify-between border-t border-gray-100 px-4 py-2 dark:border-white/[0.06]">
+              <div className="flex items-center justify-between border-t border-white/[0.18] px-4 py-2 dark:border-white/[0.08]">
                 <div className="flex items-center gap-2 text-[10px] text-gray-400 dark:text-white/25">
                   <span className="flex items-center gap-1">
-                    <kbd className="rounded border border-gray-200 bg-gray-50 px-1 py-0.5 font-mono dark:border-white/[0.08] dark:bg-white/[0.04]">↑↓</kbd>
+                    <kbd className="rounded border border-white/[0.18] bg-white/60 px-1 py-0.5 font-mono dark:border-white/[0.10] dark:bg-white/[0.06]">↑↓</kbd>
                     navigate
                   </span>
                   <span className="flex items-center gap-1">
-                    <kbd className="rounded border border-gray-200 bg-gray-50 px-1 py-0.5 font-mono dark:border-white/[0.08] dark:bg-white/[0.04]">↵</kbd>
+                    <kbd className="rounded border border-white/[0.18] bg-white/60 px-1 py-0.5 font-mono dark:border-white/[0.10] dark:bg-white/[0.06]">↵</kbd>
                     select
                   </span>
                 </div>

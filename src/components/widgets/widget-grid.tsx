@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
+import { WidgetErrorBoundary } from './widget-error-boundary';
 
 /* ─── Types ─── */
 export interface WidgetConfig {
@@ -47,20 +48,20 @@ function WidgetCard({
       onDragOver={onDragOver}
       onDrop={onDrop}
       className={`
-        group relative rounded-xl border backdrop-blur-sm transition-all
+        group relative rounded-xl border backdrop-blur-[28px] backdrop-saturate-[180%] transition-all
         ${widget.colSpan === 2 ? 'col-span-2' : 'col-span-1'}
         ${widget.rowSpan === 2 ? 'row-span-2' : 'row-span-1'}
         ${isDragging
-          ? 'z-50 scale-[1.02] border-indigo-400/40 bg-white/90 shadow-xl shadow-indigo-500/10 dark:border-indigo-400/30 dark:bg-white/[0.06]'
+          ? 'z-50 scale-[1.02] border-indigo-400/40 bg-white/70 shadow-xl shadow-indigo-500/10 dark:border-indigo-400/30 dark:bg-white/[0.08]'
           : isOver
-            ? 'border-indigo-400/30 bg-indigo-50/50 dark:border-indigo-400/20 dark:bg-indigo-500/[0.04]'
-            : 'border-gray-200 bg-white dark:border-white/[0.06] dark:bg-white/[0.03]'
+            ? 'border-indigo-400/30 bg-indigo-50/40 dark:border-indigo-400/20 dark:bg-indigo-500/[0.06]'
+            : 'border-white/[0.18] bg-white/55 shadow-[0_8px_32px_rgba(100,120,200,0.08)] dark:border-white/[0.08] dark:bg-white/[0.04] dark:shadow-[0_8px_32px_rgba(0,0,0,0.2)]'
         }
       `}
       style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-white/[0.04]">
+      <div className="flex items-center justify-between border-b border-white/[0.18] px-4 py-3 dark:border-white/[0.06]">
         <div className="flex items-center gap-2">
           <span className="text-sm">{widget.icon}</span>
           <h3 className="text-xs font-semibold text-gray-700 dark:text-white/70">{widget.title}</h3>
@@ -135,7 +136,9 @@ export function WidgetGrid({
           onDragOver={(e) => handleDragOver(e, widget.id)}
           onDrop={handleDragEnd}
         >
-          {renderWidget(widget)}
+          <WidgetErrorBoundary>
+            {renderWidget(widget)}
+          </WidgetErrorBoundary>
         </WidgetCard>
       ))}
     </div>

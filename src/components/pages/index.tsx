@@ -1,11 +1,15 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect, useCallback } from 'react';
 import { WidgetGrid, type WidgetConfig } from '@/components/widgets/widget-grid';
 import { useGitHubData } from '@/hooks/use-github-data';
 import { useVercelData } from '@/hooks/use-vercel-data';
+import { useFirebaseData } from '@/hooks/use-firebase-data';
+import { useAlertRules, useNotifications } from '@/hooks/use-alerts-data';
+import type { Notification } from '@/hooks/use-alerts-data';
 import { useEventStore } from '@/lib/stores/event-store';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import type { GitHubCommit, GitHubPR, RateLimitInfo } from '@/lib/github';
 import type { VercelDeployment, VercelProject, VercelUsage } from '@/lib/vercel';
 
@@ -35,7 +39,7 @@ function CommitsList({ commits }: { commits: GitHubCommit[] }) {
           href={c.html_url}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600 transition-colors hover:bg-gray-100 dark:bg-white/[0.03] dark:text-white/60 dark:hover:bg-white/[0.06]"
+          className="flex items-center gap-2 rounded-lg bg-white/40 px-3 py-2 text-xs text-gray-600 transition-colors hover:bg-white/60 dark:bg-white/[0.04] dark:text-white/60 dark:hover:bg-white/[0.08]"
         >
           <span className="shrink-0 font-mono text-[10px] text-indigo-400">{c.sha}</span>
           <span className="truncate">{c.message}</span>
@@ -57,11 +61,11 @@ function PRsList({ prs }: { prs: GitHubPR[] }) {
           href={pr.html_url}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600 transition-colors hover:bg-gray-100 dark:bg-white/[0.03] dark:text-white/60 dark:hover:bg-white/[0.06]"
+          className="flex items-center gap-2 rounded-lg bg-white/40 px-3 py-2 text-xs text-gray-600 transition-colors hover:bg-white/60 dark:bg-white/[0.04] dark:text-white/60 dark:hover:bg-white/[0.08]"
         >
           <span className="shrink-0 text-emerald-400">#{pr.number}</span>
           <span className="truncate">{pr.title}</span>
-          {pr.draft && <span className="shrink-0 rounded bg-gray-200 px-1 text-[9px] dark:bg-white/10">Draft</span>}
+          {pr.draft && <span className="shrink-0 rounded bg-white/60 px-1 text-[9px] dark:bg-white/[0.12]">Draft</span>}
         </a>
       ))}
     </div>
@@ -88,7 +92,7 @@ function RateLimitWidget({ rateLimit }: { rateLimit: RateLimitInfo | undefined }
           {pct}% used
         </span>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-white/[0.06]">
+      <div className="h-2 overflow-hidden rounded-full bg-white/50 dark:bg-white/[0.08]">
         <div
           className={`h-full rounded-full transition-all ${isWarning ? 'bg-red-400' : 'bg-indigo-400'}`}
           style={{ width: `${pct}%` }}
@@ -164,7 +168,7 @@ function DeploymentsWidget({ deployments, projects, isLoading, error }: { deploy
                 href={`https://${d.url}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600 transition-colors hover:bg-gray-100 dark:bg-white/[0.03] dark:text-white/60 dark:hover:bg-white/[0.06]"
+                className="flex items-center gap-2 rounded-lg bg-white/40 px-3 py-2 text-xs text-gray-600 transition-colors hover:bg-white/60 dark:bg-white/[0.04] dark:text-white/60 dark:hover:bg-white/[0.08]"
               >
                 <div className={`h-1.5 w-1.5 shrink-0 rounded-full ${stateColors[d.state] ?? 'bg-gray-400'}`} />
                 <span className="truncate font-medium">{d.name}</span>
@@ -194,7 +198,7 @@ function DeploymentsWidget({ deployments, projects, isLoading, error }: { deploy
               return (
                 <div
                   key={p.id}
-                  className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:bg-white/[0.03] dark:text-white/60"
+                  className="flex items-center gap-2 rounded-lg bg-white/40 px-3 py-2 text-xs text-gray-600 dark:bg-white/[0.04] dark:text-white/60"
                 >
                   <div className={`h-1.5 w-1.5 shrink-0 rounded-full ${p.latestDeploymentState === 'READY' ? 'bg-emerald-400' : 'bg-yellow-400 animate-pulse'}`} />
                   <div className="flex-1 min-w-0">
@@ -249,19 +253,19 @@ function VercelOverviewWidget({ deployments, projects, isLoading, error }: { dep
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-white/[0.03]">
+        <div className="rounded-lg bg-white/40 px-3 py-2 dark:bg-white/[0.04]">
           <p className="text-lg font-semibold text-indigo-400">{projects.length}</p>
           <p className="text-[10px] text-gray-400 dark:text-white/25">Projects</p>
         </div>
-        <div className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-white/[0.03]">
+        <div className="rounded-lg bg-white/40 px-3 py-2 dark:bg-white/[0.04]">
           <p className="text-lg font-semibold text-blue-400">{production}</p>
           <p className="text-[10px] text-gray-400 dark:text-white/25">Production</p>
         </div>
-        <div className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-white/[0.03]">
+        <div className="rounded-lg bg-white/40 px-3 py-2 dark:bg-white/[0.04]">
           <p className="text-lg font-semibold text-emerald-400">{ready}</p>
           <p className="text-[10px] text-gray-400 dark:text-white/25">Successful</p>
         </div>
-        <div className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-white/[0.03]">
+        <div className="rounded-lg bg-white/40 px-3 py-2 dark:bg-white/[0.04]">
           <p className={`text-lg font-semibold ${errored > 0 ? 'text-red-400' : 'text-gray-400 dark:text-white/30'}`}>{errored}</p>
           <p className="text-[10px] text-gray-400 dark:text-white/25">Failed</p>
         </div>
@@ -280,7 +284,7 @@ function VercelOverviewWidget({ deployments, projects, isLoading, error }: { dep
           <span>Success rate</span>
           <strong className={successRate >= 90 ? 'text-emerald-400' : successRate >= 70 ? 'text-yellow-400' : 'text-red-400'}>{successRate}%</strong>
         </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-white/[0.06]">
+        <div className="h-1.5 overflow-hidden rounded-full bg-white/50 dark:bg-white/[0.08]">
           <div
             className={`h-full rounded-full transition-all ${successRate >= 90 ? 'bg-emerald-400' : successRate >= 70 ? 'bg-yellow-400' : 'bg-red-400'}`}
             style={{ width: `${Math.max(successRate, 2)}%` }}
@@ -292,7 +296,7 @@ function VercelOverviewWidget({ deployments, projects, isLoading, error }: { dep
       {frameworks.size > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {Array.from(frameworks.entries()).map(([fw, count]) => (
-            <span key={fw} className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-500 dark:bg-white/[0.06] dark:text-white/40">
+            <span key={fw} className="rounded-full bg-white/50 px-2 py-0.5 text-[10px] text-gray-500 dark:bg-white/[0.08] dark:text-white/40">
               {fw} ({count})
             </span>
           ))}
@@ -318,7 +322,7 @@ function VercelUsageWidget({ usage, isLoading, error }: { usage: VercelUsage | n
   const fmtBytes = (b: number) => b >= 1_073_741_824 ? `${(b / 1_073_741_824).toFixed(2)} GB` : b >= 1_048_576 ? `${(b / 1_048_576).toFixed(1)} MB` : b >= 1024 ? `${(b / 1024).toFixed(1)} KB` : `${b} B`;
 
   const planColors: Record<string, string> = {
-    hobby: 'bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-white/50',
+    hobby: 'bg-white/50 text-gray-600 dark:bg-white/[0.08] dark:text-white/50',
     pro: 'bg-indigo-500/10 text-indigo-500 dark:bg-indigo-500/20 dark:text-indigo-400',
     enterprise: 'bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400',
   };
@@ -342,7 +346,7 @@ function VercelUsageWidget({ usage, isLoading, error }: { usage: VercelUsage | n
       </div>
       <div className="grid grid-cols-3 gap-2">
         {metrics.map((m) => (
-          <div key={m.label} className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-white/[0.03]">
+          <div key={m.label} className="rounded-lg bg-white/40 px-3 py-2 dark:bg-white/[0.04]">
             <p className={`text-lg font-semibold ${m.color}`}>{m.value}</p>
             <p className="text-[10px] text-gray-400 dark:text-white/25">{m.label}</p>
           </div>
@@ -353,15 +357,26 @@ function VercelUsageWidget({ usage, isLoading, error }: { usage: VercelUsage | n
 }
 
 function ActivityTimeline({ commits }: { commits: GitHubCommit[] }) {
-  // Aggregate commits by day of week (Mon=0 ... Sun=6)
+  // Get start of current week (Monday 00:00:00)
+  const now = new Date();
+  const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon ... 6=Sat
+  const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - diffToMonday);
+  monday.setHours(0, 0, 0, 0);
+
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const counts = [0, 0, 0, 0, 0, 0, 0];
 
+  // Only count commits from this week (Monday onwards)
+  let weeklyTotal = 0;
   for (const c of commits) {
     const d = new Date(c.date);
-    // JS getDay: 0=Sun, 1=Mon ... 6=Sat -> remap to Mon=0 ... Sun=6
-    const idx = (d.getDay() + 6) % 7;
-    counts[idx]!++;
+    if (d >= monday) {
+      const idx = (d.getDay() + 6) % 7; // Mon=0 ... Sun=6
+      counts[idx]!++;
+      weeklyTotal++;
+    }
   }
 
   const max = Math.max(...counts, 1); // avoid div by 0
@@ -392,7 +407,7 @@ function ActivityTimeline({ commits }: { commits: GitHubCommit[] }) {
         ))}
       </div>
       <p className="mt-2 text-center text-[10px] text-gray-400 dark:text-white/25">
-        {commits.length} commits this cycle
+        {weeklyTotal} commits this week
       </p>
     </div>
   );
@@ -437,7 +452,7 @@ function LiveEventsWidget() {
           {events.map((ev) => (
             <div
               key={ev.id}
-              className="flex items-start gap-2 rounded-lg bg-gray-50 px-3 py-2 text-xs dark:bg-white/[0.03]"
+              className="flex items-start gap-2 rounded-lg bg-white/40 px-3 py-2 text-xs dark:bg-white/[0.04]"
             >
               <span className="mt-0.5 text-base">
                 {ev.type === 'push' ? '📤' : ev.type.startsWith('pr') ? '🔀' : ev.type === 'ci' ? '⚙️' : ev.type === 'deployment' ? '🚀' : '📌'}
@@ -512,9 +527,10 @@ export function DashboardContent({ userName }: { userName?: string }) {
 
 function WidgetSkeleton() {
   return (
-    <div className="space-y-2 animate-pulse">
+    <div className="space-y-3">
+      <div className="h-5 w-2/5 rounded-md bg-white/40 dark:bg-white/[0.06] skeleton-shimmer" />
       {[1, 2, 3].map((i) => (
-        <div key={i} className="h-8 rounded-lg bg-gray-100 dark:bg-white/[0.04]" />
+        <div key={i} className="h-8 rounded-lg bg-white/40 dark:bg-white/[0.06] skeleton-shimmer" style={{ width: `${100 - i * 12}%` }} />
       ))}
     </div>
   );
@@ -547,7 +563,7 @@ export function GitHubContent() {
         {isLoading ? (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-20 animate-pulse rounded-xl border border-gray-200 bg-gray-100 dark:border-white/[0.06] dark:bg-white/[0.03]" />
+              <div key={i} className="h-20 animate-pulse rounded-xl border border-white/[0.18] bg-white/40 dark:border-white/[0.08] dark:bg-white/[0.04]" />
             ))}
           </div>
         ) : (
@@ -558,7 +574,7 @@ export function GitHubContent() {
                 href={repo.html_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="rounded-xl border border-gray-200 dark:border-white/[0.06] bg-white dark:bg-white/[0.03] p-4 transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.05]"
+                className="rounded-xl border border-white/[0.18] dark:border-white/[0.08] bg-white/55 dark:bg-white/[0.04] p-4 transition-colors hover:bg-white/70 dark:hover:bg-white/[0.06]"
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-white">
@@ -595,7 +611,7 @@ export function GitHubContent() {
         {isLoading ? (
           <div className="space-y-2">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-12 animate-pulse rounded-xl border border-gray-200 bg-gray-100 dark:border-white/[0.06] dark:bg-white/[0.03]" />
+              <div key={i} className="h-12 animate-pulse rounded-xl border border-white/[0.18] bg-white/40 dark:border-white/[0.08] dark:bg-white/[0.04]" />
             ))}
           </div>
         ) : (
@@ -607,7 +623,7 @@ export function GitHubContent() {
                 target="_blank"
                 rel="noopener noreferrer"
                 {...fadeIn}
-                className="flex items-start gap-3 rounded-xl border border-gray-200 dark:border-white/[0.06] bg-gray-50 dark:bg-white/[0.02] p-4 transition-colors hover:bg-gray-100 dark:hover:bg-white/[0.04]"
+                className="flex items-start gap-3 rounded-xl border border-white/[0.18] dark:border-white/[0.08] bg-white/40 dark:bg-white/[0.03] p-4 transition-colors hover:bg-white/60 dark:hover:bg-white/[0.06]"
               >
                 <span className="mt-0.5 text-base">📤</span>
                 <div className="flex-1 min-w-0">
@@ -615,7 +631,7 @@ export function GitHubContent() {
                   <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-400 dark:text-white/35">
                     <span>{c.repo}</span>
                     <span>·</span>
-                    <span className="rounded bg-gray-100 dark:bg-white/[0.06] px-1.5 py-0.5 font-mono text-[10px]">{c.sha}</span>
+                    <span className="rounded bg-white/50 dark:bg-white/[0.08] px-1.5 py-0.5 font-mono text-[10px]">{c.sha}</span>
                     <span>·</span>
                     <span>{c.author}</span>
                     <span>·</span>
@@ -636,7 +652,7 @@ export function GitHubContent() {
         {isLoading ? (
           <div className="space-y-2">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-12 animate-pulse rounded-xl border border-gray-200 bg-gray-100 dark:border-white/[0.06] dark:bg-white/[0.03]" />
+              <div key={i} className="h-12 animate-pulse rounded-xl border border-white/[0.18] bg-white/40 dark:border-white/[0.08] dark:bg-white/[0.04]" />
             ))}
           </div>
         ) : (data?.pullRequests ?? []).length === 0 ? (
@@ -650,7 +666,7 @@ export function GitHubContent() {
                 target="_blank"
                 rel="noopener noreferrer"
                 {...fadeIn}
-                className="flex items-start gap-3 rounded-xl border border-gray-200 dark:border-white/[0.06] bg-gray-50 dark:bg-white/[0.02] p-4 transition-colors hover:bg-gray-100 dark:hover:bg-white/[0.04]"
+                className="flex items-start gap-3 rounded-xl border border-white/[0.18] dark:border-white/[0.08] bg-white/40 dark:bg-white/[0.03] p-4 transition-colors hover:bg-white/60 dark:hover:bg-white/[0.06]"
               >
                 <span className="mt-0.5 text-base">🔀</span>
                 <div className="flex-1 min-w-0">
@@ -664,7 +680,7 @@ export function GitHubContent() {
                     {pr.draft && (
                       <>
                         <span>·</span>
-                        <span className="rounded bg-gray-200 px-1 text-[9px] dark:bg-white/10">Draft</span>
+                        <span className="rounded bg-white/60 px-1 text-[9px] dark:bg-white/[0.12]">Draft</span>
                       </>
                     )}
                   </div>
@@ -763,11 +779,11 @@ export function DeploymentsContent() {
             key={s.label}
             {...fadeIn}
             transition={{ delay: 0.05 + i * 0.05 }}
-            className="rounded-xl border border-gray-200 dark:border-white/[0.06] bg-white dark:bg-white/[0.03] p-4"
+            className="rounded-xl border border-white/[0.18] dark:border-white/[0.08] bg-white/55 dark:bg-white/[0.04] p-4"
           >
             <p className="text-xs text-gray-400 dark:text-white/30">{s.label}</p>
             {isLoading ? (
-              <div className="mt-1 h-8 w-16 animate-pulse rounded bg-gray-100 dark:bg-white/[0.04]" />
+              <div className="mt-1 h-8 w-16 animate-pulse rounded bg-white/40 dark:bg-white/[0.06]" />
             ) : (
               <>
                 <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{s.value}</p>
@@ -782,7 +798,7 @@ export function DeploymentsContent() {
       {isLoading ? (
         <div className="space-y-2">
           {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-16 animate-pulse rounded-xl border border-gray-200 bg-gray-100 dark:border-white/[0.06] dark:bg-white/[0.03]" />
+            <div key={i} className="h-16 animate-pulse rounded-xl border border-white/[0.18] bg-white/40 dark:border-white/[0.08] dark:bg-white/[0.04]" />
           ))}
         </div>
       ) : deployments.length === 0 ? (
@@ -797,7 +813,7 @@ export function DeploymentsContent() {
               rel="noopener noreferrer"
               {...fadeIn}
               transition={{ delay: 0.1 + i * 0.03 }}
-              className="flex items-center gap-4 rounded-xl border border-gray-200 dark:border-white/[0.06] bg-gray-50 dark:bg-white/[0.02] p-4 transition-colors hover:bg-gray-100 dark:hover:bg-white/[0.04]"
+              className="flex items-center gap-4 rounded-xl border border-white/[0.18] dark:border-white/[0.08] bg-white/40 dark:bg-white/[0.03] p-4 transition-colors hover:bg-white/60 dark:hover:bg-white/[0.06]"
             >
               <div className={`h-2.5 w-2.5 shrink-0 rounded-full ${statusColors[d.state] ?? 'bg-gray-400'}`} />
               <div className="flex-1 min-w-0">
@@ -806,7 +822,7 @@ export function DeploymentsContent() {
                     {d.meta?.githubCommitMessage ?? d.name}
                   </span>
                   {d.meta?.githubCommitRef && (
-                    <span className="shrink-0 rounded bg-gray-100 dark:bg-white/[0.06] px-1.5 py-0.5 font-mono text-[10px] text-gray-500 dark:text-white/40">
+                    <span className="shrink-0 rounded bg-white/50 dark:bg-white/[0.08] px-1.5 py-0.5 font-mono text-[10px] text-gray-500 dark:text-white/40">
                       {d.meta.githubCommitRef}
                     </span>
                   )}
@@ -833,90 +849,104 @@ export function DeploymentsContent() {
 
 /* ─── Firebase ─── */
 export function FirebaseContent() {
+  const { data, isLoading, isError } = useFirebaseData();
+
+  const statCards = data
+    ? [
+        { label: 'Total Documents', value: data.stats.totalDocs.toLocaleString(), sub: `Across ${data.collections.length} collections` },
+        { label: 'Webhook Events (7d)', value: data.stats.totalWebhookEvents.toLocaleString(), sub: 'Last 7 days' },
+        { label: 'Users', value: data.stats.usersCount.toLocaleString(), sub: 'Registered accounts' },
+        { label: 'Auth Users', value: data.stats.recentAuthEvents.toLocaleString(), sub: 'In Firebase Auth' },
+      ]
+    : [];
+
   return (
     <>
       <motion.div {...fadeIn} transition={{ duration: 0.4 }} className="mb-8">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Firebase Metrics</h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-white/40">
-          Firestore usage, auth events, and storage metrics.
+          Firestore usage, auth events, and activity metrics.
         </p>
       </motion.div>
 
+      {isError && (
+        <div className="mb-4 rounded-xl border border-red-500/20 bg-red-500/[0.06] p-4 text-sm text-red-400">
+          Failed to load Firebase data. Check your Firebase configuration.
+        </div>
+      )}
+
       {/* Stat cards */}
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {[
-          { label: 'Firestore Reads', value: '12,450', change: 'of 50K daily limit', pct: 25 },
-          { label: 'Firestore Writes', value: '890', change: 'of 20K daily limit', pct: 4 },
-          { label: 'Auth Events', value: '34', change: 'Today', pct: 0 },
-          { label: 'Storage', value: '1.2 MB', change: 'of 1 GB limit', pct: 0 },
-        ].map((s, i) => (
-          <motion.div
-            key={s.label}
-            {...fadeIn}
-            transition={{ delay: 0.05 + i * 0.05 }}
-            className="rounded-xl border border-gray-200 dark:border-white/[0.06] bg-white dark:bg-white/[0.03] p-4"
-          >
-            <p className="text-xs text-gray-400 dark:text-white/30">{s.label}</p>
-            <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{s.value}</p>
-            <p className="mt-1 text-[11px] text-gray-400 dark:text-white/25">{s.change}</p>
-            {s.pct > 0 && (
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-white/[0.06]">
-                <div
-                  className="h-full rounded-full bg-orange-400/60"
-                  style={{ width: `${s.pct}%` }}
-                />
-              </div>
-            )}
-          </motion.div>
-        ))}
+        {isLoading
+          ? Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-24 animate-pulse rounded-xl border border-white/[0.18] bg-white/40 dark:border-white/[0.08] dark:bg-white/[0.04]" />
+            ))
+          : statCards.map((s, i) => (
+              <motion.div
+                key={s.label}
+                {...fadeIn}
+                transition={{ delay: 0.05 + i * 0.05 }}
+                className="rounded-xl border border-white/[0.18] dark:border-white/[0.08] bg-white/55 dark:bg-white/[0.04] p-4"
+              >
+                <p className="text-xs text-gray-400 dark:text-white/30">{s.label}</p>
+                <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{s.value}</p>
+                <p className="mt-1 text-[11px] text-gray-400 dark:text-white/25">{s.sub}</p>
+              </motion.div>
+            ))}
       </div>
 
-      {/* Usage chart */}
+      {/* Usage chart - Recharts area chart */}
       <motion.div
         {...fadeIn}
         transition={{ delay: 0.3 }}
-        className="rounded-xl border border-gray-200 dark:border-white/[0.06] bg-gray-50 dark:bg-white/[0.02] p-5"
+        className="rounded-xl border border-white/[0.18] dark:border-white/[0.08] bg-white/40 dark:bg-white/[0.03] p-5"
       >
-        <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">7-Day Usage Trend</h3>
-        <div className="flex h-36 items-end justify-between gap-3 px-2">
-          {[
-            { reads: 60, writes: 20 },
-            { reads: 55, writes: 25 },
-            { reads: 70, writes: 30 },
-            { reads: 45, writes: 15 },
-            { reads: 80, writes: 35 },
-            { reads: 65, writes: 28 },
-            { reads: 90, writes: 40 },
-          ].map((d, i) => (
-            <div key={i} className="flex flex-1 gap-1">
-              <motion.div
-                initial={{ height: 0 }}
-                animate={{ height: `${d.reads}%` }}
-                transition={{ delay: 0.4 + i * 0.05, duration: 0.5 }}
-                className="flex-1 rounded-t-sm bg-gradient-to-t from-orange-500/40 to-orange-400/20"
+        <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">7-Day Activity Trend</h3>
+        {isLoading ? (
+          <div className="h-44 animate-pulse rounded bg-white/40 dark:bg-white/[0.06]" />
+        ) : (
+          <ResponsiveContainer width="100%" height={176}>
+            <AreaChart data={data?.dailyActivity ?? []}>
+              <defs>
+                <linearGradient id="colorEvents" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#818cf8" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="#818cf8" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 10, fill: 'currentColor' }}
+                axisLine={false}
+                tickLine={false}
+                className="text-gray-500 dark:text-white/30"
               />
-              <motion.div
-                initial={{ height: 0 }}
-                animate={{ height: `${d.writes}%` }}
-                transition={{ delay: 0.45 + i * 0.05, duration: 0.5 }}
-                className="flex-1 rounded-t-sm bg-gradient-to-t from-amber-500/30 to-amber-400/15"
+              <YAxis
+                allowDecimals={false}
+                tick={{ fontSize: 10, fill: 'currentColor' }}
+                axisLine={false}
+                tickLine={false}
+                width={30}
+                className="text-gray-500 dark:text-white/30"
               />
-            </div>
-          ))}
-        </div>
-        <div className="mt-2 flex justify-between px-2 text-[10px] text-gray-300 dark:text-white/20">
-          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
-            <span key={d}>{d}</span>
-          ))}
-        </div>
-        <div className="mt-3 flex items-center gap-4 text-[11px] text-gray-400 dark:text-white/30">
-          <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-sm bg-orange-400/50" /> Reads
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-sm bg-amber-400/40" /> Writes
-          </span>
-        </div>
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'rgba(12,12,29,0.9)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  color: '#fff',
+                }}
+              />
+              <Area
+                type="monotone"
+                dataKey="events"
+                stroke="#818cf8"
+                strokeWidth={2}
+                fill="url(#colorEvents)"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
       </motion.div>
 
       {/* Collections */}
@@ -924,47 +954,79 @@ export function FirebaseContent() {
         <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-white/30">
           Collections
         </h3>
-        <div className="space-y-2">
-          {[
-            { name: 'users', docs: 1, reads: 340, writes: 12 },
-            { name: 'events', docs: 2450, reads: 8900, writes: 780 },
-            { name: 'settings', docs: 1, reads: 120, writes: 3 },
-          ].map((c) => (
-            <div
-              key={c.name}
-              className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-white/[0.06] bg-gray-50 dark:bg-white/[0.02] p-4"
-            >
-              <div>
-                <span className="font-mono text-sm text-gray-900 dark:text-white">{c.name}</span>
-                <p className="mt-0.5 text-[11px] text-gray-400 dark:text-white/30">{c.docs} documents</p>
+        {isLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-16 animate-pulse rounded-xl border border-white/[0.18] bg-white/40 dark:border-white/[0.08] dark:bg-white/[0.04]" />
+            ))}
+          </div>
+        ) : (data?.collections ?? []).length === 0 ? (
+          <p className="text-sm text-gray-400 dark:text-white/30">No collections found.</p>
+        ) : (
+          <div className="space-y-2">
+            {(data?.collections ?? []).map((c) => (
+              <div
+                key={c.name}
+                className="flex items-center justify-between rounded-xl border border-white/[0.18] dark:border-white/[0.08] bg-white/40 dark:bg-white/[0.03] p-4"
+              >
+                <div>
+                  <span className="font-mono text-sm text-gray-900 dark:text-white">{c.name}</span>
+                  <p className="mt-0.5 text-[11px] text-gray-400 dark:text-white/30">
+                    {c.docs.toLocaleString()} document{c.docs !== 1 ? 's' : ''}
+                  </p>
+                </div>
               </div>
-              <div className="flex gap-4 text-[11px] text-gray-400 dark:text-white/35">
-                <span>{c.reads} reads</span>
-                <span>{c.writes} writes</span>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </motion.div>
     </>
   );
 }
 
 /* ─── Alerts ─── */
-export function AlertsContent() {
-  const alerts = [
-    { severity: 'error', msg: 'Deploy failed on experiment/sse branch', time: '2d ago', resolved: false },
-    { severity: 'warning', msg: 'GitHub API rate limit at 80% (4,000/5,000)', time: '5h ago', resolved: false },
-    { severity: 'info', msg: 'New PR #12 opened on RehanPulse', time: '5h ago', resolved: true },
-    { severity: 'success', msg: 'Production deploy succeeded — main@abc1234', time: '2h ago', resolved: true },
-    { severity: 'warning', msg: 'Firestore reads approaching 50% of daily limit', time: '1h ago', resolved: false },
-  ];
+const EVENT_TYPES = [
+  { value: 'push', label: 'Push events' },
+  { value: 'pr_opened', label: 'Pull request opened' },
+  { value: 'pr_closed', label: 'Pull request closed' },
+  { value: 'deployment', label: 'Deployment events' },
+  { value: 'ci', label: 'CI / check runs' },
+  { value: 'issue', label: 'Issue events' },
+  { value: 'star', label: 'Star events' },
+];
 
-  const severityStyle: Record<string, { dot: string; bg: string }> = {
-    error: { dot: 'bg-red-400', bg: 'border-red-500/20 dark:border-red-500/10 bg-red-500/[0.06] dark:bg-red-500/[0.03]' },
-    warning: { dot: 'bg-yellow-400', bg: 'border-yellow-500/20 dark:border-yellow-500/10 bg-yellow-500/[0.06] dark:bg-yellow-500/[0.03]' },
-    info: { dot: 'bg-blue-400', bg: 'border-blue-500/20 dark:border-blue-500/10 bg-blue-500/[0.06] dark:bg-blue-500/[0.03]' },
-    success: { dot: 'bg-emerald-400', bg: 'border-emerald-500/20 dark:border-emerald-500/10 bg-emerald-500/[0.06] dark:bg-emerald-500/[0.03]' },
+const severityStyle: Record<string, { dot: string; bg: string }> = {
+  error: { dot: 'bg-red-400', bg: 'border-red-500/20 dark:border-red-500/10 bg-red-500/[0.06] dark:bg-red-500/[0.03]' },
+  warning: { dot: 'bg-yellow-400', bg: 'border-yellow-500/20 dark:border-yellow-500/10 bg-yellow-500/[0.06] dark:bg-yellow-500/[0.03]' },
+  info: { dot: 'bg-blue-400', bg: 'border-blue-500/20 dark:border-blue-500/10 bg-blue-500/[0.06] dark:bg-blue-500/[0.03]' },
+  success: { dot: 'bg-emerald-400', bg: 'border-emerald-500/20 dark:border-emerald-500/10 bg-emerald-500/[0.06] dark:bg-emerald-500/[0.03]' },
+};
+
+function timeAgo(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+export function AlertsContent() {
+  const { data: rulesData, isLoading: rulesLoading, toggleRule, createRule, deleteRule } = useAlertRules();
+  const { data: notifsData, isLoading: notifsLoading, markRead, markAllRead } = useNotifications();
+  const [showAddRule, setShowAddRule] = useState(false);
+  const [newRuleName, setNewRuleName] = useState('');
+  const [newRuleEvent, setNewRuleEvent] = useState('push');
+
+  const rules = rulesData?.rules ?? [];
+  const notifications = notifsData?.notifications ?? [];
+  const unreadCount = notifications.filter((n: Notification) => !n.read).length;
+
+  const handleAddRule = () => {
+    if (!newRuleName.trim()) return;
+    createRule.mutate({ name: newRuleName.trim(), eventType: newRuleEvent });
+    setNewRuleName('');
+    setShowAddRule(false);
   };
 
   return (
@@ -972,88 +1034,215 @@ export function AlertsContent() {
       <motion.div {...fadeIn} transition={{ duration: 0.4 }} className="mb-8">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Alerts & Notifications</h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-white/40">
-          Failed deploys, rate-limit warnings, and system events.
+          Webhook-triggered alerts and notification rules.
         </p>
       </motion.div>
 
       {/* Summary cards */}
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
-          { label: 'Unresolved', value: '3', color: 'text-red-400' },
-          { label: 'Resolved (24h)', value: '2', color: 'text-emerald-400' },
-          { label: 'Total (7d)', value: '12', color: 'text-gray-900 dark:text-white' },
-          { label: 'Alert Rules', value: '4', color: 'text-indigo-400' },
+          { label: 'Unread', value: String(unreadCount), color: unreadCount > 0 ? 'text-red-400' : 'text-gray-400' },
+          { label: 'Total Notifications', value: String(notifications.length), color: 'text-gray-900 dark:text-white' },
+          { label: 'Alert Rules', value: String(rules.length), color: 'text-indigo-400' },
+          { label: 'Active Rules', value: String(rules.filter((r) => r.enabled).length), color: 'text-emerald-400' },
         ].map((s, i) => (
           <motion.div
             key={s.label}
             {...fadeIn}
             transition={{ delay: 0.05 + i * 0.05 }}
-            className="rounded-xl border border-gray-200 dark:border-white/[0.06] bg-white dark:bg-white/[0.03] p-4"
+            className="rounded-xl border border-white/[0.18] dark:border-white/[0.08] bg-white/55 dark:bg-white/[0.04] p-4"
           >
             <p className="text-xs text-gray-400 dark:text-white/30">{s.label}</p>
-            <p className={`mt-1 text-2xl font-semibold ${s.color}`}>{s.value}</p>
+            {rulesLoading || notifsLoading ? (
+              <div className="mt-1 h-8 w-12 animate-pulse rounded bg-white/40 dark:bg-white/[0.06]" />
+            ) : (
+              <p className={`mt-1 text-2xl font-semibold ${s.color}`}>{s.value}</p>
+            )}
           </motion.div>
         ))}
       </div>
 
-      {/* Alert list */}
-      <div className="space-y-2">
-        {alerts.map((a, i) => {
-          const style = severityStyle[a.severity] ?? severityStyle.info!;
-          return (
-            <motion.div
-              key={i}
-              {...fadeIn}
-              transition={{ delay: 0.2 + i * 0.05 }}
-              className={`flex items-start gap-3 rounded-xl border p-4 ${style.bg} ${a.resolved ? 'opacity-50' : ''}`}
+      {/* Notification list */}
+      <div className="mb-6">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-white/30">
+            Recent Notifications
+          </h3>
+          {unreadCount > 0 && (
+            <button
+              onClick={() => markAllRead.mutate()}
+              className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
             >
-              <div className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${style.dot}`} />
-              <div className="flex-1">
-                <p className="text-sm text-gray-900 dark:text-white">{a.msg}</p>
-                <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-400 dark:text-white/30">
-                  <span className="capitalize">{a.severity}</span>
-                  <span>·</span>
-                  <span>{a.time}</span>
-                  {a.resolved && (
-                    <>
+              Mark all read
+            </button>
+          )}
+        </div>
+        {notifsLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-16 animate-pulse rounded-xl border border-white/[0.18] bg-white/40 dark:border-white/[0.08] dark:bg-white/[0.04]" />
+            ))}
+          </div>
+        ) : notifications.length === 0 ? (
+          <p className="text-sm text-gray-400 dark:text-white/30">
+            No notifications yet. Alerts will appear here when webhook events match your rules.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {notifications.map((n: Notification, i: number) => {
+              const style = severityStyle[n.severity] ?? severityStyle.info!;
+              return (
+                <motion.div
+                  key={n.id}
+                  {...fadeIn}
+                  transition={{ delay: 0.2 + i * 0.03 }}
+                  className={`flex items-start gap-3 rounded-xl border p-4 ${style.bg} ${n.read ? 'opacity-50' : ''}`}
+                >
+                  <div className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${style.dot}`} />
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-900 dark:text-white">{n.message}</p>
+                    <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-400 dark:text-white/30">
+                      <span className="capitalize">{n.severity}</span>
                       <span>·</span>
-                      <span className="text-emerald-500 dark:text-emerald-400/70">Resolved</span>
-                    </>
+                      <span>{n.eventType}</span>
+                      <span>·</span>
+                      <span>{timeAgo(n.createdAt)}</span>
+                      {n.read && (
+                        <>
+                          <span>·</span>
+                          <span className="text-emerald-500 dark:text-emerald-400/70">Read</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  {!n.read && (
+                    <button
+                      onClick={() => markRead.mutate(n.id)}
+                      className="shrink-0 rounded-lg px-2 py-1 text-[10px] text-gray-400 hover:bg-white/40 dark:hover:bg-white/[0.08] transition-colors"
+                    >
+                      Dismiss
+                    </button>
                   )}
-                </div>
-              </div>
-            </motion.div>
-          );
-        })}
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Alert rules */}
       <motion.div {...fadeIn} transition={{ delay: 0.5 }} className="mt-6">
-        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-white/30">
-          Alert Rules
-        </h3>
-        <div className="space-y-2">
-          {[
-            { rule: 'Deploy failure on any branch', enabled: true },
-            { rule: 'GitHub API rate limit > 80%', enabled: true },
-            { rule: 'Firestore reads > 50% daily limit', enabled: true },
-            { rule: 'New pull request opened', enabled: false },
-          ].map((r) => (
-            <div
-              key={r.rule}
-              className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-white/[0.06] bg-gray-50 dark:bg-white/[0.02] p-4"
-            >
-              <span className="text-sm text-gray-600 dark:text-white/70">{r.rule}</span>
-              <div
-                className={`h-5 w-9 rounded-full p-0.5 transition-colors ${r.enabled ? 'bg-indigo-500' : 'bg-gray-200 dark:bg-white/10'}`}
-              >
-                <div
-                  className={`h-4 w-4 rounded-full bg-white transition-transform ${r.enabled ? 'translate-x-4' : 'translate-x-0'}`}
-                />
-              </div>
-            </div>
-          ))}
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-white/30">
+            Alert Rules
+          </h3>
+          <button
+            onClick={() => setShowAddRule(!showAddRule)}
+            className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+          >
+            {showAddRule ? 'Cancel' : '+ Add Rule'}
+          </button>
         </div>
+
+        {/* Add rule form */}
+        <AnimatePresence>
+          {showAddRule && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="mb-3 flex gap-2 rounded-xl border border-indigo-500/20 bg-indigo-500/[0.04] p-4">
+                <input
+                  type="text"
+                  value={newRuleName}
+                  onChange={(e) => setNewRuleName(e.target.value)}
+                  placeholder="Rule name..."
+                  className="flex-1 rounded-lg border border-white/[0.18] bg-white/40 px-3 py-1.5 text-sm text-gray-900 placeholder-gray-400 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white dark:placeholder-white/30"
+                />
+                <select
+                  value={newRuleEvent}
+                  onChange={(e) => setNewRuleEvent(e.target.value)}
+                  className="rounded-lg border border-white/[0.18] bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-white/[0.08] dark:bg-[#1a1a2e] dark:text-white"
+                >
+                  {EVENT_TYPES.map((t) => (
+                    <option key={t.value} value={t.value} className="bg-white text-gray-900 dark:bg-[#1a1a2e] dark:text-white">{t.label}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={handleAddRule}
+                  disabled={!newRuleName.trim() || createRule.isPending}
+                  className="rounded-lg bg-indigo-500 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-indigo-600 disabled:opacity-50"
+                >
+                  Add
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {rulesLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-14 animate-pulse rounded-xl border border-white/[0.18] bg-white/40 dark:border-white/[0.08] dark:bg-white/[0.04]" />
+            ))}
+          </div>
+        ) : rules.length === 0 ? (
+          <p className="text-sm text-gray-400 dark:text-white/30">
+            No alert rules configured. Add a rule to get notified about webhook events.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {rules.map((r) => (
+              <div
+                key={r.id}
+                className="flex items-center justify-between rounded-xl border border-white/[0.18] dark:border-white/[0.08] bg-white/55 dark:bg-[#0c0c1d]/80 backdrop-blur-xl p-4 transition-colors"
+              >
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-medium text-gray-800 dark:text-white/80">{r.name}</span>
+                  <p className="mt-0.5 text-[10px] text-gray-400 dark:text-white/25">
+                    Triggers on: {EVENT_TYPES.find((t) => t.value === r.eventType)?.label ?? r.eventType}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => deleteRule.mutate(r.id)}
+                    className="text-[10px] text-red-400/60 hover:text-red-400 transition-colors"
+                  >
+                    Delete
+                  </button>
+                  <button
+                    role="switch"
+                    aria-checked={r.enabled}
+                    aria-label={r.name}
+                    disabled={toggleRule.isPending}
+                    onClick={() => toggleRule.mutate(r.id)}
+                    className={`relative h-6 w-11 rounded-full border transition-colors ${
+                      r.enabled
+                        ? 'bg-indigo-500 border-indigo-400/50'
+                        : 'bg-gray-200 border-gray-300 dark:bg-white/[0.08] dark:border-white/[0.12]'
+                    } ${toggleRule.isPending ? 'opacity-60' : ''}`}
+                  >
+                    {toggleRule.isPending && toggleRule.variables === r.id ? (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent text-white/70" />
+                      </div>
+                    ) : (
+                      <div
+                        className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full shadow-sm transition-transform ${
+                          r.enabled
+                            ? 'translate-x-5 bg-white'
+                            : 'translate-x-0 bg-white dark:bg-white/60'
+                        }`}
+                      />
+                    )}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </motion.div>
     </>
   );
@@ -1203,7 +1392,7 @@ export function SettingsContent() {
           {loading ? (
             <div className="space-y-2 animate-pulse">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="h-14 rounded-xl border border-gray-200 bg-gray-100 dark:border-white/[0.06] dark:bg-white/[0.03]" />
+                <div key={i} className="h-14 rounded-xl border border-white/[0.18] bg-white/40 dark:border-white/[0.08] dark:bg-white/[0.04]" />
               ))}
             </div>
           ) : (
@@ -1245,7 +1434,7 @@ export function SettingsContent() {
       <motion.div
         {...fadeIn}
         transition={{ delay: 0.2 }}
-        className="rounded-xl border border-gray-200 dark:border-white/[0.06] bg-white dark:bg-white/[0.03] p-5"
+        className="rounded-xl border border-white/[0.18] dark:border-white/[0.08] bg-white/55 dark:bg-white/[0.04] p-5"
       >
         <div className="flex items-center gap-2 mb-4">
           <span className="text-lg">▲</span>
@@ -1266,7 +1455,7 @@ export function SettingsContent() {
 
         {settings?.hasVercelToken ? (
           <div className="flex items-center gap-3">
-            <div className="flex-1 rounded-lg bg-gray-50 px-4 py-2.5 text-sm text-gray-500 dark:bg-white/[0.04] dark:text-white/40">
+            <div className="flex-1 rounded-lg bg-white/40 px-4 py-2.5 text-sm text-gray-500 dark:bg-white/[0.06] dark:text-white/40">
               •••••••••••••••• <span className="text-emerald-400 text-xs ml-2">Connected</span>
             </div>
             <button
@@ -1284,7 +1473,7 @@ export function SettingsContent() {
               value={vercelToken}
               onChange={(e) => setVercelToken(e.target.value)}
               placeholder="Enter your Vercel API token"
-              className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white dark:placeholder:text-white/20"
+              className="flex-1 rounded-lg border border-white/[0.18] bg-white/40 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none dark:border-white/[0.10] dark:bg-white/[0.06] dark:text-white dark:placeholder:text-white/20"
             />
             <button
               onClick={saveVercelToken}
@@ -1338,7 +1527,7 @@ function IntegrationRow({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-gray-200 dark:border-white/[0.06] bg-gray-50 dark:bg-white/[0.02] p-4">
+    <div className="flex items-center gap-3 rounded-xl border border-white/[0.18] dark:border-white/[0.08] bg-white/40 dark:bg-white/[0.03] p-4">
       <span className="text-lg">{icon}</span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">

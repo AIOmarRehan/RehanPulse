@@ -91,9 +91,18 @@ export async function fetchUserRepos(octokit: Octokit): Promise<GitHubRepo[]> {
 export async function fetchRecentCommits(
   octokit: Octokit,
   repos: GitHubRepo[],
-  limit = 15,
+  limit = 30,
 ): Promise<GitHubCommit[]> {
   const topRepos = repos.slice(0, 5);
+
+  // Get start of current week (Monday 00:00 UTC) for weekly timeline accuracy
+  const now = new Date();
+  const dayOfWeek = now.getUTCDay(); // 0=Sun
+  const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const monday = new Date(now);
+  monday.setUTCDate(now.getUTCDate() - diffToMonday);
+  monday.setUTCHours(0, 0, 0, 0);
+  const since = monday.toISOString();
 
   const allCommits: GitHubCommit[] = [];
 
@@ -103,7 +112,8 @@ export async function fetchRecentCommits(
       const { data } = await octokit.rest.repos.listCommits({
         owner,
         repo: repoName,
-        per_page: 5,
+        since,
+        per_page: 20,
       });
 
       for (const c of data) {

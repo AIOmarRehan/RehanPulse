@@ -81,7 +81,7 @@ export function CommandPalette({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: -10 }}
             transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed left-1/2 top-[20%] z-50 w-full max-w-lg -translate-x-1/2"
+            className="fixed inset-x-4 top-[12%] z-50 mx-auto max-w-lg sm:inset-x-0 sm:left-1/2 sm:top-[20%] sm:-translate-x-1/2 sm:w-full"
           >
             <Command
               className="overflow-hidden rounded-xl border border-white/[0.85] bg-white/40 shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-[28px] backdrop-saturate-[180%] dark:border-white/[0.08] dark:bg-[#0c0c1d]/60 dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)]"
@@ -140,7 +140,7 @@ export function CommandPalette({
               </Command.List>
 
               {/* Footer */}
-              <div className="flex items-center justify-between border-t border-white/[0.18] px-4 py-2 dark:border-white/[0.08]">
+              <div className="hidden sm:flex items-center justify-between border-t border-white/[0.18] px-4 py-2 dark:border-white/[0.08]">
                 <div className="flex items-center gap-2 text-[10px] text-gray-400 dark:text-white/25">
                   <span className="flex items-center gap-1">
                     <kbd className="rounded border border-white/[0.18] bg-white/60 px-1 py-0.5 font-mono dark:border-white/[0.10] dark:bg-white/[0.06]">↑↓</kbd>

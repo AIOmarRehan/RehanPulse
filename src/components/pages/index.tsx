@@ -9,6 +9,7 @@ import { useFirebaseData } from '@/hooks/use-firebase-data';
 import { useAlertRules, useNotifications } from '@/hooks/use-alerts-data';
 import type { Notification } from '@/hooks/use-alerts-data';
 import { useEventStore } from '@/lib/stores/event-store';
+import { useAuth } from '@/components/providers/auth-provider';
 import type { GitHubCommit, GitHubPR, RateLimitInfo } from '@/lib/github';
 import type { VercelDeployment, VercelProject, VercelUsage } from '@/lib/vercel';
 
@@ -1965,8 +1966,19 @@ export function SettingsContent() {
 }
 
 function DangerZone() {
+  const { user } = useAuth();
   const [confirming, setConfirming] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [typedName, setTypedName] = useState('');
   const [deleting, setDeleting] = useState(false);
+
+  // GitHub username from provider data, fallback to displayName
+  const githubUsername =
+    user?.providerData?.find((p) => p.providerId === 'github.com')?.displayName ??
+    user?.displayName ??
+    '';
+
+  const canConfirm = typedName === githubUsername;
 
   const handleDelete = async () => {
     setDeleting(true);
@@ -1977,56 +1989,146 @@ function DangerZone() {
       }
     } catch {
       setDeleting(false);
-      setConfirming(false);
     }
   };
 
   return (
-    <motion.div {...fadeIn} transition={{ delay: 0.4 }} className="mt-8">
-      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-red-400/70">
-        Danger Zone
-      </h3>
-      <div className="rounded-xl border border-red-500/20 bg-red-500/[0.04] p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-gray-900 dark:text-white">Delete Account</p>
-            <p className="mt-1 text-xs text-gray-500 dark:text-white/40">
-              Permanently delete your account and all associated data (notifications, alert rules, tokens).
-            </p>
-          </div>
-          {!confirming ? (
-            <button
-              onClick={() => setConfirming(true)}
-              className="shrink-0 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20"
-            >
-              Delete Account
-            </button>
-          ) : (
-            <div className="flex shrink-0 flex-col items-end gap-2">
-              <p className="text-[11px] text-red-400/80 max-w-[220px] text-right">
-                You can sign in again with your GitHub account, but your data (notifications, rules) will be lost.
+    <>
+      <motion.div {...fadeIn} transition={{ delay: 0.4 }} className="mt-8">
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-red-400/70">
+          Danger Zone
+        </h3>
+        <div className="rounded-xl border border-red-500/20 bg-red-500/[0.04] p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-gray-900 dark:text-white">Delete Account</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-white/40">
+                Permanently delete your account and all associated data (notifications, alert rules, tokens).
               </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setConfirming(false)}
+            </div>
+            {!confirming ? (
+              <button
+                onClick={() => setConfirming(true)}
+                className="shrink-0 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20"
+              >
+                Delete Account
+              </button>
+            ) : (
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                <p className="text-[11px] text-red-400/80 max-w-[220px] text-right">
+                  You can sign in again with your GitHub account, but your data (notifications, rules) will be lost.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setConfirming(false)}
+                    className="rounded-lg border border-white/[0.18] dark:border-white/[0.08] px-3 py-1.5 text-xs text-gray-500 dark:text-white/40 transition-colors hover:bg-white/50 dark:hover:bg-white/[0.06]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => { setShowModal(true); setTypedName(''); }}
+                    className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-red-600"
+                  >
+                    Yes, Delete Everything
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </motion.div>
+
+      {/* ── macOS-style Confirmation Modal ── */}
+      <AnimatePresence>
+        {showModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center"
+          >
+            {/* Backdrop */}
+            <div
+              className="absolute inset-0 bg-black/30 dark:bg-black/50 backdrop-blur-sm"
+              onClick={() => { if (!deleting) { setShowModal(false); } }}
+            />
+
+            {/* Dialog */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
+              className="relative w-[340px] rounded-2xl border border-gray-200/80 dark:border-white/[0.08] bg-white/95 dark:bg-[#2a2a2e]/95 backdrop-blur-2xl shadow-[0_24px_80px_rgba(0,0,0,0.15)] dark:shadow-[0_24px_80px_rgba(0,0,0,0.5)] overflow-hidden"
+            >
+              {/* Top section — icon + message */}
+              <div className="px-6 pt-6 pb-4 text-center">
+                {/* Warning icon */}
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-500/15">
+                  <svg className="h-6 w-6 text-red-500 dark:text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
+                </div>
+
+                <h3 className="text-[15px] font-semibold text-gray-900 dark:text-white leading-snug">
+                  Delete your account?
+                </h3>
+                <p className="mt-2 text-[12px] leading-relaxed text-gray-500 dark:text-white/45">
+                  This will permanently delete all your data including notifications, alert rules, and stored tokens. This action cannot be undone.
+                </p>
+              </div>
+
+              {/* Input section */}
+              <div className="px-6 pb-4">
+                <label className="block text-[11px] font-medium text-gray-500 dark:text-white/40 mb-1.5">
+                  Type <span className="font-semibold text-gray-700 dark:text-white/70">{githubUsername}</span> to confirm
+                </label>
+                <input
+                  type="text"
+                  value={typedName}
+                  onChange={(e) => setTypedName(e.target.value)}
                   disabled={deleting}
-                  className="rounded-lg border border-white/[0.18] dark:border-white/[0.08] px-3 py-1.5 text-xs text-gray-500 dark:text-white/40 transition-colors hover:bg-white/50 dark:hover:bg-white/[0.06]"
+                  placeholder={githubUsername}
+                  autoFocus
+                  spellCheck={false}
+                  autoComplete="off"
+                  className="w-full rounded-lg border border-gray-300 dark:border-white/[0.12] bg-white dark:bg-white/[0.06] px-3 py-2 text-[13px] text-gray-900 dark:text-white placeholder:text-gray-300 dark:placeholder:text-white/20 outline-none ring-0 transition-colors focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 disabled:opacity-50"
+                />
+              </div>
+
+              {/* Button bar — macOS style bottom divider + buttons */}
+              <div className="flex border-t border-gray-200/80 dark:border-white/[0.08]">
+                <button
+                  onClick={() => { setShowModal(false); setTypedName(''); }}
+                  disabled={deleting}
+                  className="flex-1 px-4 py-3 text-[13px] font-medium text-gray-700 dark:text-white/70 transition-colors hover:bg-gray-100 dark:hover:bg-white/[0.06] border-r border-gray-200/80 dark:border-white/[0.08] disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleDelete}
-                  disabled={deleting}
-                  className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-red-600 disabled:opacity-50"
+                  disabled={!canConfirm || deleting}
+                  className="flex-1 px-4 py-3 text-[13px] font-semibold text-red-500 dark:text-red-400 transition-all hover:bg-red-50 dark:hover:bg-red-500/10 disabled:opacity-30 disabled:cursor-not-allowed"
                 >
-                  {deleting ? 'Deleting...' : 'Yes, Delete Everything'}
+                  {deleting ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={3} className="opacity-25" />
+                        <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth={3} strokeLinecap="round" className="opacity-75" />
+                      </svg>
+                      Deleting…
+                    </span>
+                  ) : 'Confirm'}
                 </button>
               </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </motion.div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 

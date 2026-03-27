@@ -1,8 +1,22 @@
 {
-  "crons": [
-    {
-      "path": "/api/cron/sync",
-      "schedule": "*/10 * * * *"
-    }
+  "_comment": [
+    "This Cron Jobs is setting for:",
+    "Cron Jobs = scheduled tasks that run automatically on a timer",
+    "Like every 10 minutes, go check GitHub for new data",
+    "Every day at midnight, clean up old records",
+    "Is to keep the data fresh without needing user interaction",
+    "It's like an automatic background worker for the app",
+    "Even when no one is on the site",
+    "This requiring Pro plan from Vercel",
+    "",
+    "Disabled cron config:",
+    "{",
+    "  \"crons\": [",
+    "    {",
+    "      \"path\": \"/api/cron/sync\",",
+    "      \"schedule\": \"*/10 * * * *\"",
+    "    }",
+    "  ]",
+    "}"
   ]
 }

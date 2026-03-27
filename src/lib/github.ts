@@ -63,6 +63,12 @@ export interface RateLimitInfo {
   used: number;
 }
 
+export interface ContributionDay {
+  date: string;        // 'YYYY-MM-DD'
+  contributionCount: number;
+  contributionLevel: 'NONE' | 'FIRST_QUARTILE' | 'SECOND_QUARTILE' | 'THIRD_QUARTILE' | 'FOURTH_QUARTILE';
+}
+
 /* ─── Data Fetchers ─── */
 
 /** Fetch the user's repositories (up to 30, sorted by push date). */
@@ -190,6 +196,49 @@ export async function fetchRateLimit(octokit: Octokit): Promise<RateLimitInfo> {
     reset: core.reset,
     used: core.used,
   };
+}
+
+/** Fetch the user's contribution graph from GitHub GraphQL API. */
+export async function fetchContributionGraph(octokit: Octokit): Promise<ContributionDay[]> {
+  try {
+    const { viewer } = await octokit.graphql<{
+      viewer: {
+        contributionsCollection: {
+          contributionCalendar: {
+            weeks: Array<{
+              contributionDays: Array<{
+                date: string;
+                contributionCount: number;
+                contributionLevel: ContributionDay['contributionLevel'];
+              }>;
+            }>;
+          };
+        };
+      };
+    }>(`
+      query {
+        viewer {
+          contributionsCollection {
+            contributionCalendar {
+              weeks {
+                contributionDays {
+                  date
+                  contributionCount
+                  contributionLevel
+                }
+              }
+            }
+          }
+        }
+      }
+    `);
+
+    return viewer.contributionsCollection.contributionCalendar.weeks.flatMap(
+      (w) => w.contributionDays,
+    );
+  } catch {
+    return [];
+  }
 }
 
 /**

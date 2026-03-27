@@ -9,6 +9,7 @@ import {
   fetchRecentCommits,
   fetchOpenPRs,
   fetchRateLimit,
+  fetchContributionGraph,
 } from '@/lib/github';
 
 /* Simple in-memory cache */
@@ -37,9 +38,10 @@ export async function GET(request: NextRequest) {
 
     const octokit = await getOctokitForUser(uid);
 
-    const [repos, rateLimit] = await Promise.all([
+    const [repos, rateLimit, contributions] = await Promise.all([
       fetchUserRepos(octokit),
       fetchRateLimit(octokit),
+      fetchContributionGraph(octokit),
     ]);
 
     const [commits, pullRequests] = await Promise.all([
@@ -47,7 +49,7 @@ export async function GET(request: NextRequest) {
       fetchOpenPRs(octokit, repos),
     ]);
 
-    const payload = { repos, commits, pullRequests, rateLimit };
+    const payload = { repos, commits, pullRequests, rateLimit, contributions };
     cache.set(uid, { data: payload, ts: Date.now() });
 
     return NextResponse.json(

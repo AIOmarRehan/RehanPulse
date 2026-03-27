@@ -77,6 +77,112 @@ function useCursorGlow(ref: React.RefObject<HTMLElement | null>) {
 /* ─── Mocked Dashboard Preview ─── */
 const DEMO_TABS = ['Dashboard', 'GitHub', 'Deployments', 'Usage'] as const;
 
+/* ─── Demo Contribution Grid ─── */
+const CONTRIB_COLORS = [
+  'bg-gray-200/60 dark:bg-white/[0.06]',
+  'bg-emerald-200 dark:bg-emerald-800/70',
+  'bg-emerald-300 dark:bg-emerald-700/80',
+  'bg-emerald-400 dark:bg-emerald-600/80',
+  'bg-emerald-500 dark:bg-emerald-500',
+  'bg-emerald-600 dark:bg-emerald-400',
+];
+
+function DemoContributionGrid() {
+  const cols = 20;
+  const rows = 7;
+  const [cells, setCells] = useState<{ level: number; delay: number }[] | null>(null);
+
+  useEffect(() => {
+    setCells(
+      Array.from({ length: cols * rows }, () => ({
+        level: Math.random() < 0.3 ? 0 : Math.random() < 0.5 ? 1 : Math.random() < 0.65 ? 2 : Math.random() < 0.8 ? 3 : Math.random() < 0.92 ? 4 : 5,
+        delay: Math.random() * 1.8,
+      }))
+    );
+  }, []);
+
+  if (!cells) {
+    return (
+      <div className="grid gap-[2px]" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
+        {Array.from({ length: cols * rows }, (_, i) => (
+          <div key={i} className="aspect-square rounded-[2px] bg-gray-200/60 dark:bg-white/[0.06]" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-[2px]" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
+      {cells.map((cell, i) => (
+        <motion.div
+          key={i}
+          className={`aspect-square rounded-[2px] ${CONTRIB_COLORS[cell.level]}`}
+          initial={{ opacity: 0, scale: 0 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.2 + cell.delay, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function DemoSuccessRate() {
+  const [stats, setStats] = useState<{ projects: number; production: number; successful: number; failed: number; total: number; rate: number } | null>(null);
+
+  useEffect(() => {
+    const projects = 3 + Math.floor(Math.random() * 6);
+    const production = Math.max(1, Math.floor(projects * (0.5 + Math.random() * 0.4)));
+    const total = 10 + Math.floor(Math.random() * 30);
+    const failed = Math.floor(Math.random() * Math.max(1, Math.floor(total * 0.15)));
+    const successful = total - failed;
+    const rate = Math.round((successful / total) * 1000) / 10;
+    setStats({ projects, production, successful, failed, total, rate });
+  }, []);
+
+  if (!stats) {
+    return (
+      <div className="space-y-1.5">
+        <p className="text-xl font-semibold text-emerald-400">—</p>
+        <p className="text-[10px] text-black dark:text-white/30">Success Rate</p>
+      </div>
+    );
+  }
+
+  const rateColor = stats.rate >= 90 ? 'text-emerald-400' : stats.rate >= 70 ? 'text-amber-400' : 'text-red-400';
+  const barColor = stats.rate >= 90 ? 'bg-emerald-400' : stats.rate >= 70 ? 'bg-amber-400' : 'bg-red-400';
+
+  return (
+    <div className="flex h-full flex-col gap-2">
+      <div className="flex items-end justify-between">
+        <p className={`text-xl font-semibold ${rateColor}`}>{stats.rate}%</p>
+        <p className="text-[9px] text-black/50 dark:text-white/25">{stats.total} deploys</p>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-gray-200/80 dark:bg-white/[0.08]">
+        <motion.div
+          className={`h-full rounded-full ${barColor}`}
+          initial={{ width: 0 }}
+          animate={{ width: `${stats.rate}%` }}
+          transition={{ delay: 0.4, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+        />
+      </div>
+      <div className="grid flex-1 grid-cols-2 gap-1.5">
+        {[
+          { value: stats.projects, label: 'projects', bg: 'bg-indigo-500/10', text: 'text-indigo-400', dot: 'bg-indigo-400', glow: 'shadow-[0_0_6px_rgba(99,102,241,0.6)]' },
+          { value: stats.production, label: 'prod', bg: 'bg-blue-500/10', text: 'text-blue-400', dot: 'bg-blue-400', glow: 'shadow-[0_0_6px_rgba(96,165,250,0.6)]' },
+          { value: stats.successful, label: 'ok', bg: 'bg-emerald-500/10', text: 'text-emerald-400', dot: 'bg-emerald-400', glow: 'shadow-[0_0_6px_rgba(52,211,153,0.6)]' },
+          { value: stats.failed, label: 'failed', bg: 'bg-red-500/10', text: 'text-red-400', dot: 'bg-red-400', glow: 'shadow-[0_0_6px_rgba(248,113,113,0.6)]' },
+        ].map((item) => (
+          <div key={item.label} className={`relative flex flex-col items-center justify-center rounded-lg ${item.bg} p-2`}>
+            <span className={`absolute left-1.5 top-1.5 h-1.5 w-1.5 rounded-full ${item.dot} ${item.glow} animate-pulse`} />
+            <p className={`text-base font-semibold ${item.text}`}>{item.value}</p>
+            <p className={`text-[10px] ${item.text} opacity-70`}>{item.label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function DemoSlide({ tab }: { tab: typeof DEMO_TABS[number] }) {
   if (tab === 'Dashboard') {
     return (
@@ -92,22 +198,11 @@ function DemoSlide({ tab }: { tab: typeof DEMO_TABS[number] }) {
           </div>
         ))}
         <div className="col-span-2 rounded-xl bg-gray-100/80 dark:bg-white/[0.04] border border-gray-200/60 dark:border-white/[0.06] p-3">
-          <p className="text-[10px] font-semibold text-black dark:text-white/40 mb-2">Activity</p>
-          <div className="flex items-end gap-1.5 h-16">
-            {[40, 65, 50, 80, 45, 70, 90].map((h, i) => (
-              <motion.div
-                key={i}
-                initial={{ height: 0 }}
-                animate={{ height: `${h}%` }}
-                transition={{ delay: 0.3 + i * 0.05, duration: 0.5, ease }}
-                className="flex-1 rounded-t bg-gradient-to-t from-indigo-500/40 to-indigo-400/20"
-              />
-            ))}
-          </div>
+          <p className="text-[10px] font-semibold text-black dark:text-white/40 mb-2">Contributions</p>
+          <DemoContributionGrid />
         </div>
         <div className="rounded-xl bg-gray-100/80 dark:bg-white/[0.04] border border-gray-200/60 dark:border-white/[0.06] p-3">
-          <p className={`text-xl font-semibold text-amber-400`}>98.2%</p>
-          <p className="text-[10px] text-black dark:text-white/30">Success Rate</p>
+          <DemoSuccessRate />
         </div>
       </div>
     );

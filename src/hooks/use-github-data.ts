@@ -2,13 +2,14 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
-import type { GitHubRepo, GitHubCommit, GitHubPR, RateLimitInfo } from '@/lib/github';
+import type { GitHubRepo, GitHubCommit, GitHubPR, RateLimitInfo, ContributionDay } from '@/lib/github';
 
 interface GitHubData {
   repos: GitHubRepo[];
   commits: GitHubCommit[];
   pullRequests: GitHubPR[];
   rateLimit: RateLimitInfo;
+  contributions: ContributionDay[];
 }
 
 async function fetchGitHubData(): Promise<GitHubData> {

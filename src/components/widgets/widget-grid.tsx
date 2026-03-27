@@ -124,7 +124,7 @@ export function WidgetGrid({
     .filter((w): w is WidgetConfig => w !== undefined);
 
   return (
-    <div className="grid auto-rows-[minmax(180px,auto)] grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid auto-rows-[minmax(110px,auto)] grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
       {orderedWidgets.map((widget) => (
         <WidgetCard
           key={widget.id}

@@ -10,7 +10,7 @@ import { useAlertRules, useNotifications } from '@/hooks/use-alerts-data';
 import type { Notification } from '@/hooks/use-alerts-data';
 import { useEventStore } from '@/lib/stores/event-store';
 import { useAuth } from '@/components/providers/auth-provider';
-import type { GitHubCommit, GitHubPR, RateLimitInfo } from '@/lib/github';
+import type { GitHubCommit, GitHubPR, RateLimitInfo, ContributionDay } from '@/lib/github';
 import type { VercelDeployment, VercelProject, VercelUsage } from '@/lib/vercel';
 
 const fadeIn = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } };
@@ -33,7 +33,7 @@ const DASHBOARD_WIDGETS: WidgetConfig[] = [
   { id: 'rate-limit', title: 'API Rate Limit', icon: <ThemeIcon dark="/macos-icons/api-rate-limit.png" light="/macos-icons/api-rate-limit.png" alt="Rate Limit" />, colSpan: 1 },
   { id: 'vercel-overview', title: 'Vercel Overview', icon: <ThemeIcon dark="/macos-icons/vercel.png" light="/macos-icons/vercel.png" alt="Vercel" />, colSpan: 1 },
   { id: 'vercel-usage', title: 'Vercel Usage', icon: <svg width="16" height="16" viewBox="0 0 76 65" fill="currentColor" className="text-gray-900 dark:text-white"><path d="M37.5274 0L75.0548 65H0L37.5274 0Z" /></svg>, colSpan: 2 },
-  { id: 'activity', title: 'Activity Timeline', icon: <ThemeIcon dark="/macos-icons/activity-timeline.png" light="/macos-icons/activity-timeline.png" alt="Activity" />, colSpan: 2 },
+  { id: 'activity', title: 'Contributions', icon: <ThemeIcon dark="/macos-icons/contributions-darkmode.png" light="/macos-icons/contributions-lightmode.png" alt="Contributions" />, colSpan: 2 },
   { id: 'live-events', title: 'Live Events (SSE)', icon: <ThemeIcon dark="/macos-icons/live-events.png" light="/macos-icons/live-events.png" alt="Live Events" />, colSpan: 2 },
 ];
 
@@ -366,59 +366,100 @@ function VercelUsageWidget({ usage, isLoading, error }: { usage: VercelUsage | n
   );
 }
 
-function ActivityTimeline({ commits }: { commits: GitHubCommit[] }) {
-  // Get start of current week (Monday 00:00:00)
-  const now = new Date();
-  const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon ... 6=Sat
-  const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - diffToMonday);
-  monday.setHours(0, 0, 0, 0);
+function ActivityTimeline({ contributions }: { contributions: ContributionDay[] }) {
+  // Use all contributions (full year ≈ 52–53 weeks, exactly as GitHub shows)
+  const days = contributions;
 
-  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const counts = [0, 0, 0, 0, 0, 0, 0];
+  // Group into weeks (columns) — GitHub starts weeks on Sunday
+  const weeks: ContributionDay[][] = [];
+  for (let i = 0; i < days.length; i += 7) {
+    weeks.push(days.slice(i, i + 7));
+  }
 
-  // Only count commits from this week (Monday onwards)
-  let weeklyTotal = 0;
-  for (const c of commits) {
-    const d = new Date(c.date);
-    if (d >= monday) {
-      const idx = (d.getDay() + 6) % 7; // Mon=0 ... Sun=6
-      counts[idx]!++;
-      weeklyTotal++;
+  // Color mapping matching GitHub's contribution graph
+  const levelColor: Record<ContributionDay['contributionLevel'], string> = {
+    NONE: 'bg-gray-100 dark:bg-white/[0.06]',
+    FIRST_QUARTILE: 'bg-emerald-200 dark:bg-emerald-800/70',
+    SECOND_QUARTILE: 'bg-emerald-400 dark:bg-emerald-600/80',
+    THIRD_QUARTILE: 'bg-emerald-500 dark:bg-emerald-500',
+    FOURTH_QUARTILE: 'bg-emerald-600 dark:bg-emerald-400',
+  };
+
+  // Month labels — positioned at the first week that starts in that month
+  const monthLabels: { label: string; col: number }[] = [];
+  let lastMonth = -1;
+  for (let w = 0; w < weeks.length; w++) {
+    const firstDay = weeks[w]?.[0];
+    if (firstDay) {
+      const m = new Date(firstDay.date).getMonth();
+      if (m !== lastMonth) {
+        monthLabels.push({ label: new Date(firstDay.date).toLocaleString('en', { month: 'short' }), col: w });
+        lastMonth = m;
+      }
     }
   }
 
-  const max = Math.max(...counts, 1); // avoid div by 0
+  // Total contributions in the last year
+  const total = days.reduce((sum, d) => sum + d.contributionCount, 0);
+
+  const dayLabels = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
 
   return (
-    <div>
-      <div className="flex h-28 items-end justify-between gap-2">
-        {counts.map((count, i) => {
-          const pct = Math.max((count / max) * 100, 4); // min 4% so bars are visible
-          return (
-            <motion.div
+    <div className="flex h-full flex-col justify-center">
+      <div className="space-y-1">
+        {/* Month labels row */}
+        <div className="relative ml-6 h-4 overflow-hidden">
+          {monthLabels.map((m, i) => (
+            <span
               key={i}
-              initial={{ height: 0 }}
-              animate={{ height: `${pct}%` }}
-              transition={{ delay: 0.2 + i * 0.05, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-              className="group relative flex-1 rounded-t-md bg-gradient-to-t from-indigo-500/40 to-indigo-400/20"
+              className="absolute top-0 text-[9px] text-gray-400 dark:text-white/30"
+              style={{ left: `${(m.col / weeks.length) * 100}%` }}
             >
-              <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] font-medium text-gray-400 opacity-0 transition-opacity group-hover:opacity-100 dark:text-white/40">
-                {count}
+              {m.label}
+            </span>
+          ))}
+        </div>
+
+        <div className="flex gap-[2px]">
+          {/* Day-of-week labels */}
+          <div className="flex shrink-0 flex-col justify-between py-[1px] pr-[3px]">
+            {dayLabels.map((label, i) => (
+              <span key={i} className="flex h-0 flex-1 items-center text-[9px] leading-none text-gray-400 dark:text-white/25">
+                {label}
               </span>
-            </motion.div>
-          );
-        })}
+            ))}
+          </div>
+
+          {/* Contribution grid — auto-sized to fill available width */}
+          <div className="grid flex-1 gap-[2px]" style={{ gridTemplateColumns: `repeat(${weeks.length}, 1fr)` }}>
+            {weeks.map((week, wi) => (
+              <div key={wi} className="flex flex-col gap-[2px]">
+                {week.map((day, di) => (
+                  <div
+                    key={di}
+                    className={`aspect-square w-full rounded-[2px] ${levelColor[day.contributionLevel]}`}
+                    title={`${day.contributionCount} contribution${day.contributionCount !== 1 ? 's' : ''} on ${new Date(day.date).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })}`}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Footer: total + legend */}
+        <div className="flex items-center justify-between pt-0.5">
+          <p className="text-[10px] text-gray-400 dark:text-white/25">
+            {total.toLocaleString()} contributions in the last year
+          </p>
+          <div className="flex items-center gap-[3px] text-[9px] text-gray-400 dark:text-white/25">
+            <span>Less</span>
+            {(['NONE', 'FIRST_QUARTILE', 'SECOND_QUARTILE', 'THIRD_QUARTILE', 'FOURTH_QUARTILE'] as const).map((level) => (
+              <div key={level} className={`h-[9px] w-[9px] rounded-[2px] ${levelColor[level]}`} />
+            ))}
+            <span>More</span>
+          </div>
+        </div>
       </div>
-      <div className="mt-2 flex justify-between text-[10px] text-gray-300 dark:text-white/20">
-        {days.map((d) => (
-          <span key={d}>{d}</span>
-        ))}
-      </div>
-      <p className="mt-2 text-center text-[10px] text-gray-400 dark:text-white/25">
-        {weeklyTotal} commits this week
-      </p>
     </div>
   );
 }
@@ -524,14 +565,14 @@ export function DashboardContent({ userName }: { userName?: string }) {
       return <VercelOverviewWidget deployments={vercelData?.deployments ?? []} projects={vercelData?.projects ?? []} isLoading={vercelLoading} error={vercelError as Error | null} />;
     }
     if (widget.id === 'vercel-usage') {
-      return <VercelUsageWidget usage={vercelData?.usage ?? null} isLoading={vercelLoading} error={vercelError as Error | null} />;
+      return <div className="h-[148px]"><VercelUsageWidget usage={vercelData?.usage ?? null} isLoading={vercelLoading} error={vercelError as Error | null} /></div>;
     }
     if (widget.id === 'activity') {
       if (isLoading) return <WidgetSkeleton />;
-      return <ActivityTimeline commits={data?.commits ?? []} />;
+      return <div className="h-[148px]"><ActivityTimeline contributions={data?.contributions ?? []} /></div>;
     }
     if (widget.id === 'live-events') {
-      return <LiveEventsWidget />;
+      return <div className="h-[148px] overflow-auto"><LiveEventsWidget /></div>;
     }
     return null;
   };

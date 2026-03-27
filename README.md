@@ -180,6 +180,49 @@ After deploying, go to **Settings → Register Webhooks** in the dashboard. This
 
 ---
 
+## ⏱Cron Jobs (Currently Disabled)
+
+This project includes a cron job configuration intended for running automated background tasks.
+
+### What are Cron Jobs?
+
+Cron jobs are scheduled tasks that run automatically at defined intervals without user interaction. They are commonly used to keep data up-to-date or perform routine maintenance.
+
+### Intended Use
+
+The cron job in this project was designed to:
+
+* Sync data from GitHub every 10 minutes
+* Perform periodic background updates
+* Keep application data fresh automatically
+
+### Configuration (Disabled)
+
+```json
+{
+  "crons": [
+    {
+      "path": "/api/cron/sync",
+      "schedule": "*/10 * * * *"
+    }
+  ]
+}
+```
+
+### Current Status
+
+This feature is currently **disabled** because it requires a paid plan on Vercel.
+
+### Alternative
+
+As an alternative, scheduled tasks can be implemented using:
+
+* GitHub Actions (scheduled workflows)
+* External cron services
+
+
+---
+
 ## License
 
 Private project — not open-source.

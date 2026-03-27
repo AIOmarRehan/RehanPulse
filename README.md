@@ -180,7 +180,7 @@ After deploying, go to **Settings → Register Webhooks** in the dashboard. This
 
 ---
 
-## ⏱Cron Jobs (Currently Disabled)
+## Cron Jobs (Currently Disabled)
 
 This project includes a cron job configuration intended for running automated background tasks.
 

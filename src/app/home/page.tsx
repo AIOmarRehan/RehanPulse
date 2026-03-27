@@ -456,15 +456,10 @@ export default function HomePage() {
             </motion.div>
 
             {/* Auto-typing sentences */}
-            <div className="mt-4 h-8 flex items-center justify-center">
-              <span className="text-base font-medium text-black dark:text-white/60 sm:text-lg">
-                {firstPart}
-              </span>
-              {secondPart && <span>&nbsp;</span>}
-              <span className="text-base font-medium sm:text-lg" style={{ color: '#7E5FF4' }}>
-                {secondPart}
-              </span>
-              <span className="ml-0.5 inline-block w-[2px] h-5 bg-[#7E5FF4] animate-pulse" />
+            <div className="mt-4 min-h-[2rem] sm:min-h-[2rem] text-center">
+              <span className="text-base font-medium text-black dark:text-white/60 sm:text-lg">{firstPart}</span>
+              <span className="text-base font-medium sm:text-lg" style={{ color: '#7E5FF4' }}>{secondPart}</span>
+              <span className="ml-0.5 inline-block w-[2px] h-5 bg-[#7E5FF4] animate-pulse align-middle" />
             </div>
 
             <motion.p

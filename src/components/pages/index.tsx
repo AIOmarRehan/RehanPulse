@@ -481,8 +481,8 @@ function LiveEventsWidget() {
       : 'Disconnected';
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2 text-[10px]">
+    <div className="flex h-full flex-col gap-2">
+      <div className="flex shrink-0 items-center gap-2 text-[10px]">
         <span className={`h-1.5 w-1.5 rounded-full ${statusDot}`} />
         <span className="text-gray-400 dark:text-white/30">{statusLabel}</span>
       </div>
@@ -499,7 +499,7 @@ function LiveEventsWidget() {
           </p>
         </div>
       ) : (
-        <div className="max-h-52 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
+        <div className="min-h-0 flex-1 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
           {events.map((ev) => (
             <div
               key={ev.id}
@@ -572,7 +572,7 @@ export function DashboardContent({ userName }: { userName?: string }) {
       return <div className="h-[148px]"><ActivityTimeline contributions={data?.contributions ?? []} /></div>;
     }
     if (widget.id === 'live-events') {
-      return <div className="h-[148px] overflow-auto"><LiveEventsWidget /></div>;
+      return <div className="h-[148px]"><LiveEventsWidget /></div>;
     }
     return null;
   };

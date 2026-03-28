@@ -205,6 +205,7 @@ function DeploymentsWidget({ deployments, projects, isLoading, error }: { deploy
           ) : (
             projects.map((p) => {
               const prodUrl = p.targets?.production?.url;
+              const domains = p.domains ?? [];
               return (
                 <div
                   key={p.id}
@@ -214,15 +215,22 @@ function DeploymentsWidget({ deployments, projects, isLoading, error }: { deploy
                   <div className="flex-1 min-w-0">
                     <span className="block truncate font-medium">{p.name}</span>
                     {prodUrl && (
+                      <span className="block truncate text-[10px] text-indigo-400">
+                        {prodUrl}
+                      </span>
+                    )}
+                    {domains.map((domain) => (
                       <a
-                        href={`https://${prodUrl}`}
+                        key={domain}
+                        href={`https://${domain}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block truncate text-[10px] text-indigo-400 hover:underline"
+                        className="flex items-center gap-1 truncate text-[10px] text-emerald-400 hover:underline"
                       >
-                        {prodUrl}
+                        <svg className="h-2.5 w-2.5 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 3.5H3a1 1 0 0 0-1 1V13a1 1 0 0 0 1 1h8.5a1 1 0 0 0 1-1V9.5" /><path d="M9.5 1.5h5v5" /><path d="M14.5 1.5 7 9" /></svg>
+                        <span className="truncate">{domain}</span>
                       </a>
-                    )}
+                    ))}
                   </div>
                   <span className="shrink-0 text-[10px] text-gray-400 dark:text-white/25">
                     {p.framework ?? 'Unknown'}
@@ -534,14 +542,17 @@ function LiveEventsWidget() {
 /* ─── Dashboard ─── */
 export function DashboardContent({ userName }: { userName?: string }) {
   const { data, isLoading, refresh } = useGitHubData();
-  const { data: vercelData, isLoading: vercelLoading, error: vercelError } = useVercelData();
+  const { data: vercelData, isLoading: vercelLoading, error: vercelError, refresh: refreshVercel } = useVercelData();
+  const { refresh: refreshFirebase } = useFirebaseData();
+  const { refresh: refreshAlerts } = useAlertRules();
+  const { refresh: refreshNotifications } = useNotifications();
   const [refreshing, setRefreshing] = useState(false);
   const clearEvents = useEventStore((s) => s.clearEvents);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     clearEvents();
-    try { await refresh(); } catch { /* ignore */ }
+    try { await Promise.all([refresh(), refreshVercel(), refreshFirebase(), refreshAlerts(), refreshNotifications()]); } catch { /* ignore */ }
     finally { setRefreshing(false); }
   };
 
@@ -600,7 +611,7 @@ export function DashboardContent({ userName }: { userName?: string }) {
               <polyline points="1 20 1 14 7 14" />
               <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
             </svg>
-            {refreshing ? 'Syncing...' : 'Refresh'}
+            {refreshing ? 'Syncing...' : 'Sync'}
           </button>
         </div>
       </motion.div>
@@ -624,13 +635,17 @@ function WidgetSkeleton() {
 /* ─── GitHub Activity ─── */
 export function GitHubContent() {
   const { data, isLoading, error, refresh } = useGitHubData();
+  const { refresh: refreshVercel } = useVercelData();
+  const { refresh: refreshFirebase } = useFirebaseData();
+  const { refresh: refreshAlerts } = useAlertRules();
+  const { refresh: refreshNotifications } = useNotifications();
   const [refreshing, setRefreshing] = useState(false);
   const clearEvents = useEventStore((s) => s.clearEvents);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     clearEvents();
-    try { await refresh(); } catch { /* ignore */ }
+    try { await Promise.all([refresh(), refreshVercel(), refreshFirebase(), refreshAlerts(), refreshNotifications()]); } catch { /* ignore */ }
     finally { setRefreshing(false); }
   };
 
@@ -655,7 +670,7 @@ export function GitHubContent() {
               <polyline points="1 20 1 14 7 14" />
               <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
             </svg>
-            {refreshing ? 'Syncing...' : 'Refresh'}
+            {refreshing ? 'Syncing...' : 'Sync'}
           </button>
         </div>
       </motion.div>
@@ -807,7 +822,18 @@ export function GitHubContent() {
 
 /* ─── Deployments ─── */
 export function DeploymentsContent() {
-  const { data: vercelData, isLoading, error } = useVercelData(50);
+  const { data: vercelData, isLoading, error, refresh: refreshVercel } = useVercelData(50);
+  const { refresh: refreshGitHub } = useGitHubData();
+  const { refresh: refreshFirebase } = useFirebaseData();
+  const { refresh: refreshAlerts } = useAlertRules();
+  const { refresh: refreshNotifications } = useNotifications();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleSync = async () => {
+    setRefreshing(true);
+    try { await Promise.all([refreshGitHub(), refreshVercel(), refreshFirebase(), refreshAlerts(), refreshNotifications()]); } catch { /* ignore */ }
+    finally { setRefreshing(false); }
+  };
   const deployments = vercelData?.deployments ?? [];
 
   const statusColors: Record<string, string> = {
@@ -877,10 +903,27 @@ export function DeploymentsContent() {
   return (
     <>
       <motion.div {...fadeIn} transition={{ duration: 0.4 }} className="mb-8">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Deployments</h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-white/40">
-          Vercel deployment history and status for all your projects.
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Deployments</h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-white/40">
+              Vercel deployment history and status for all your projects.
+            </p>
+          </div>
+          <button
+            onClick={handleSync}
+            disabled={refreshing}
+            title="Sync latest data"
+            className="flex items-center gap-1.5 rounded-lg border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] px-3 py-2 text-xs font-medium text-gray-600 dark:text-white/50 transition-colors hover:bg-white/60 dark:hover:bg-white/[0.08] disabled:opacity-50"
+          >
+            <svg viewBox="0 0 24 24" className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10" />
+              <polyline points="1 20 1 14 7 14" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+            </svg>
+            {refreshing ? 'Syncing...' : 'Sync'}
+          </button>
+        </div>
       </motion.div>
 
       {/* Stats */}
@@ -972,7 +1015,19 @@ export function FirebaseContent() {
     connectGoogle,
     selectProject,
     disconnect,
+    refresh: refreshFirebase,
   } = useFirebaseData();
+  const { refresh: refreshGitHub } = useGitHubData();
+  const { refresh: refreshVercel } = useVercelData();
+  const { refresh: refreshAlerts } = useAlertRules();
+  const { refresh: refreshNotifications } = useNotifications();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleSync = async () => {
+    setRefreshing(true);
+    try { await Promise.all([refreshGitHub(), refreshVercel(), refreshFirebase(), refreshAlerts(), refreshNotifications()]); } catch { /* ignore */ }
+    finally { setRefreshing(false); }
+  };
 
   /* ─── State 1: Loading connection status ─── */
   if (connectionLoading) {
@@ -1124,6 +1179,19 @@ export function FirebaseContent() {
         </div>
         <div className="flex items-center gap-3">
           <button
+            onClick={handleSync}
+            disabled={refreshing}
+            title="Sync latest data"
+            className="flex items-center gap-1.5 rounded-lg border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] px-3 py-2 text-xs font-medium text-gray-600 dark:text-white/50 transition-colors hover:bg-white/60 dark:hover:bg-white/[0.08] disabled:opacity-50"
+          >
+            <svg viewBox="0 0 24 24" className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10" />
+              <polyline points="1 20 1 14 7 14" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+            </svg>
+            {refreshing ? 'Syncing...' : 'Sync'}
+          </button>
+          <button
             type="button"
             onClick={() => selectProject.mutate('')}
             className="text-xs text-gray-400 hover:text-indigo-400 transition dark:text-white/30 dark:hover:text-indigo-400"
@@ -1240,8 +1308,18 @@ function timeAgo(dateStr: string) {
 }
 
 export function AlertsContent() {
-  const { data: rulesData, isLoading: rulesLoading, toggleRule, createRule, renameRule, deleteRule } = useAlertRules();
-  const { data: notifsData, isLoading: notifsLoading, markRead, markAllRead, clearAll } = useNotifications();
+  const { data: rulesData, isLoading: rulesLoading, toggleRule, createRule, renameRule, deleteRule, refresh: refreshAlerts } = useAlertRules();
+  const { data: notifsData, isLoading: notifsLoading, markRead, markAllRead, clearAll, refresh: refreshNotifications } = useNotifications();
+  const { refresh: refreshGitHub } = useGitHubData();
+  const { refresh: refreshVercel } = useVercelData();
+  const { refresh: refreshFirebase } = useFirebaseData();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleSync = async () => {
+    setRefreshing(true);
+    try { await Promise.all([refreshGitHub(), refreshVercel(), refreshFirebase(), refreshAlerts(), refreshNotifications()]); } catch { /* ignore */ }
+    finally { setRefreshing(false); }
+  };
   const [showAddRule, setShowAddRule] = useState(false);
   const [newRuleName, setNewRuleName] = useState('');
   const [newRuleEvent, setNewRuleEvent] = useState('push');
@@ -1332,10 +1410,27 @@ export function AlertsContent() {
   return (
     <>
       <motion.div {...fadeIn} transition={{ duration: 0.4 }} className="mb-8">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Alerts & Notifications</h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-white/40">
-          Webhook-triggered alerts and notification rules.
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Alerts & Notifications</h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-white/40">
+              Webhook-triggered alerts and notification rules.
+            </p>
+          </div>
+          <button
+            onClick={handleSync}
+            disabled={refreshing}
+            title="Sync latest data"
+            className="flex items-center gap-1.5 rounded-lg border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] px-3 py-2 text-xs font-medium text-gray-600 dark:text-white/50 transition-colors hover:bg-white/60 dark:hover:bg-white/[0.08] disabled:opacity-50"
+          >
+            <svg viewBox="0 0 24 24" className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10" />
+              <polyline points="1 20 1 14 7 14" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+            </svg>
+            {refreshing ? 'Syncing...' : 'Sync'}
+          </button>
+        </div>
       </motion.div>
 
       {/* Summary cards */}
@@ -1736,6 +1831,14 @@ export function SettingsContent() {
   const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const { refresh: refreshGitHub } = useGitHubData();
+  const { refresh: refreshVercel } = useVercelData();
+  const { refresh: refreshFirebase } = useFirebaseData();
+  const { refresh: refreshAlerts } = useAlertRules();
+  const { refresh: refreshNotifications } = useNotifications();
+
+  const refreshAll = useCallback(async () => {
+    await Promise.all([refreshGitHub(), refreshVercel(), refreshFirebase(), refreshAlerts(), refreshNotifications()]);
+  }, [refreshGitHub, refreshVercel, refreshFirebase, refreshAlerts, refreshNotifications]);
 
   const loadSettings = useCallback(async () => {
     try {
@@ -1827,6 +1930,8 @@ export function SettingsContent() {
           text: `Webhooks registered on ${stats.registered} repos (${stats.skipped} already had webhooks${stats.errors > 0 ? `, ${stats.errors} errors` : ''})`,
         });
         loadSettings();
+        // Refresh all data so the UI reflects the new webhook state
+        await refreshAll().catch(() => {});
       }
     } catch {
       setMessage({ type: 'error', text: 'Network error' });
@@ -1882,9 +1987,9 @@ export function SettingsContent() {
                     setSyncing(true);
                     setMessage(null);
                     try {
-                      await refreshGitHub();
-                      setMessage({ type: 'success', text: 'GitHub data synced — stale repos and PRs have been refreshed.' });
-                    } catch { setMessage({ type: 'error', text: 'Failed to sync GitHub data.' }); }
+                      await refreshAll();
+                      setMessage({ type: 'success', text: 'All data synced — GitHub, Vercel, Firebase, alerts & notifications refreshed.' });
+                    } catch { setMessage({ type: 'error', text: 'Failed to sync data.' }); }
                     finally { setSyncing(false); }
                   }}
                   disabled={syncing || !settings?.hasGitHubToken}

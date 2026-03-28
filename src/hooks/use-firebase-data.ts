@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import {
   signInWithPopup,
   linkWithPopup,
@@ -193,5 +194,14 @@ export function useFirebaseData() {
     connectGoogle,
     selectProject,
     disconnect,
+
+    // refresh all firebase data
+    refresh: useCallback(async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['firebase-connection'] }),
+        qc.invalidateQueries({ queryKey: ['firebase-projects'] }),
+        qc.invalidateQueries({ queryKey: ['firebase-data'] }),
+      ]);
+    }, [qc]),
   };
 }

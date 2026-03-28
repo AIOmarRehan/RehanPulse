@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 
 export interface AlertRule {
   id: string;
@@ -112,7 +113,11 @@ export function useAlertRules() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['alert-rules'] }),
   });
 
-  return { ...query, toggleRule, createRule, renameRule, deleteRule };
+  const refresh = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ['alert-rules'] });
+  }, [queryClient]);
+
+  return { ...query, toggleRule, createRule, renameRule, deleteRule, refresh };
 }
 
 export function useNotifications() {
@@ -162,5 +167,9 @@ export function useNotifications() {
 
   const unreadCount = (query.data?.notifications ?? []).filter((n) => !n.read).length;
 
-  return { ...query, markRead, markAllRead, clearAll, unreadCount };
+  const refresh = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ['notifications'] });
+  }, [queryClient]);
+
+  return { ...query, markRead, markAllRead, clearAll, unreadCount, refresh };
 }

@@ -25,6 +25,7 @@ export interface VercelProject {
   updatedAt: number;
   latestDeploymentState: string | null;
   targets: { production?: { url?: string } } | null;
+  domains: string[];
 }
 
 /* ─── Fetchers ─── */
@@ -157,12 +158,36 @@ export async function fetchProjects(uid: string): Promise<VercelProject[]> {
 
   const json = (await res.json()) as { projects: Array<Record<string, unknown>> };
 
-  return json.projects.map((p) => ({
+  const projects = json.projects.map((p) => ({
     id: p.id as string,
     name: p.name as string,
     framework: (p.framework as string | null) ?? null,
     updatedAt: p.updatedAt as number,
     latestDeploymentState: ((p.latestDeployments as Array<Record<string, unknown>> | undefined)?.[0]?.readyState as string | null) ?? null,
     targets: p.targets as VercelProject['targets'],
+    domains: [] as string[],
   }));
+
+  // Fetch domains for each project in parallel
+  const domainResults = await Promise.allSettled(
+    projects.map(async (p) => {
+      const domRes = await fetch(`${VERCEL_API}/v9/projects/${p.id}/domains`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(FETCH_TIMEOUT),
+      });
+      if (!domRes.ok) return [];
+      const domJson = (await domRes.json()) as { domains: Array<{ name: string }> };
+      return (domJson.domains ?? []).map((d) => d.name);
+    })
+  );
+
+  for (let i = 0; i < projects.length; i++) {
+    const result = domainResults[i];
+    if (result && result.status === 'fulfilled') {
+      projects[i]!.domains = result.value;
+    }
+  }
+
+  return projects;
 }

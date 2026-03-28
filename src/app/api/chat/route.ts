@@ -6,7 +6,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
-const DEFAULT_MODEL = 'mistralai/Mistral-7B-Instruct-v0.3';
+const DEFAULT_MODEL = 'meta-llama/Llama-3.1-8B-Instruct';
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const hfResponse = await fetch(
-      `https://api-inference.huggingface.co/models/${encodeURIComponent(model)}/v1/chat/completions`,
+      'https://router.huggingface.co/v1/chat/completions',
       {
         method: 'POST',
         headers: {
@@ -80,6 +80,7 @@ export async function POST(request: NextRequest) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          model,
           messages: fullMessages,
           stream: true,
           max_tokens: 1024,

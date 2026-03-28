@@ -195,7 +195,7 @@ ANALYZE=false
 
 # AI Chatbot (optional, enables Pulse AI)
 HUGGINGFACE_API_KEY=hf_...
-# HUGGINGFACE_MODEL=mistralai/Mistral-7B-Instruct-v0.3
+# HUGGINGFACE_MODEL=meta-llama/Llama-3.1-8B-Instruct
 ```
 
 All environment variables are validated at build time. Set `SKIP_ENV_VALIDATION=1` for CI environments where secrets are not available.

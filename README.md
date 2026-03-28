@@ -31,6 +31,13 @@ A real-time developer activity dashboard built with Next.js 14, Firebase, and mu
 - Grouped notification system with read/unread tracking
 - Automatic 30-second polling for new notifications
 
+**AI Chatbot (Pulse AI)**
+- Context-aware assistant that understands your repos, deployments, alerts, and Firebase data
+- Powered by Hugging Face Inference API (zero additional npm dependencies)
+- Streaming responses via SSE for real-time output
+- Automatically injects live dashboard data as context from React Query caches
+- Accessible from a floating action button or the command palette
+
 **User Interface**
 - macOS-inspired frosted glass design with dark and light mode support
 - Draggable widget grid for dashboard customization
@@ -79,6 +86,7 @@ A real-time developer activity dashboard built with Next.js 14, Firebase, and mu
 | GitHub API | Octokit (REST + GraphQL) |
 | Vercel API | REST (deployments, projects, domains, usage) |
 | Token Encryption | AES-256-GCM via Web Crypto API |
+| AI Chat | Hugging Face Inference API (OpenAI-compatible streaming) |
 
 ### Development Tooling
 
@@ -103,6 +111,7 @@ src/
       settings/       # User settings CRUD, webhook registration
       stream/         # SSE endpoint (Firestore onSnapshot to client)
       vercel/         # Vercel API proxy with force-refresh support
+      chat/           # AI chatbot endpoint (HF Inference API streaming)
       webhooks/       # GitHub webhook receiver (HMAC verified)
     home/             # Public landing page
     login/            # GitHub OAuth sign-in
@@ -111,10 +120,11 @@ src/
     layout/           # App shell (sidebar, top bar, content area)
     pages/            # Page-level components (Dashboard, GitHub, Deployments, Firebase, Alerts, Settings)
     providers/        # Auth, Theme, React Query context providers
+    chat/             # AI chat panel (Pulse AI)
     spotlight/        # Command palette
     ui/               # Shared UI primitives
     widgets/          # Draggable widget grid with error boundaries
-  hooks/              # useEventSource (SSE), useGitHubData, useVercelData, useFirebaseData, useAlertRules, useNotifications
+  hooks/              # useEventSource (SSE), useGitHubData, useVercelData, useFirebaseData, useAlertRules, useNotifications, useChat
   lib/
     crypto.ts         # AES-256-GCM encryption for stored tokens
     firebase.ts       # Client SDK initialization
@@ -182,6 +192,10 @@ TOKEN_ENCRYPTION_KEY=a-32-character-or-longer-secret-key
 # Optional
 SKIP_ENV_VALIDATION=0
 ANALYZE=false
+
+# AI Chatbot (optional, enables Pulse AI)
+HUGGINGFACE_API_KEY=hf_...
+# HUGGINGFACE_MODEL=mistralai/Mistral-7B-Instruct-v0.3
 ```
 
 All environment variables are validated at build time. Set `SKIP_ENV_VALIDATION=1` for CI environments where secrets are not available.

@@ -17,6 +17,7 @@ import {
   SettingsContent,
 } from '@/components/pages';
 import { CommandPalette, type SpotlightAction } from '@/components/spotlight/command-palette';
+import { ChatPanel } from '@/components/chat/chat-panel';
 
 const NAV_ITEMS = [
   { darkIcon: '/macos-icons/activity-timeline.png', lightIcon: '/macos-icons/activity-timeline.png', label: 'Dashboard', id: 'dashboard' },
@@ -46,6 +47,7 @@ export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [cmdOpen, setCmdOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const hasMounted = useRef(false);
 
@@ -168,6 +170,14 @@ export function AppShell() {
       group: 'Account',
       keywords: 'logout sign out exit',
       onSelect: signOut,
+    },
+    {
+      id: 'open-chat',
+      label: 'Open AI Chat',
+      icon: <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>,
+      group: 'Actions',
+      keywords: 'ai chat pulse assistant chatbot',
+      onSelect: () => setChatOpen(true),
     },
   ], [theme, setTheme, sidebarOpen, signOut]);
 
@@ -585,6 +595,28 @@ export function AppShell() {
 
       {/* Spotlight Command Palette */}
       <CommandPalette actions={spotlightActions} open={cmdOpen} onOpenChange={handleCmdOpen} />
+
+      {/* AI Chat */}
+      <ChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
+      {!chatOpen && (
+        <button
+          onClick={() => setChatOpen(true)}
+          aria-label="Open AI chat"
+          className="fixed bottom-4 right-4 z-[70] flex h-11 w-11 items-center justify-center rounded-full bg-indigo-500 text-white shadow-lg shadow-indigo-500/25 transition-all hover:scale-105 hover:shadow-indigo-500/40 active:scale-95"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }

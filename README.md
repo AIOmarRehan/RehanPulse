@@ -244,4 +244,4 @@ After deploying to a public URL, go to Settings in the dashboard and click "Regi
 
 ## License
 
-Private project. Not open-source.
+This project is licensed under the MIT License.

@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useEventStore } from '@/lib/stores/event-store';
 
 export interface ChatMessage {
   id: string;
@@ -339,19 +340,12 @@ export function useChat() {
     }
 
     // SSE live events from event store
-    try {
-      const eventStoreModule = require('@/lib/stores/event-store');
-      if (eventStoreModule?.useEventStore) {
-        const events = eventStoreModule.useEventStore.getState()?.events;
-        if (events && Array.isArray(events) && events.length > 0) {
-          parts.push(`\nLive Webhook Events (${events.length} recent):`);
-          events.slice(0, 20).forEach((e: Record<string, unknown>) => {
-            parts.push(`  - [${e.eventType}] ${e.message || e.action || ''} at ${e.timestamp || ''}`);
-          });
-        }
-      }
-    } catch {
-      // event store not available, skip
+    const events = useEventStore.getState()?.events;
+    if (events && events.length > 0) {
+      parts.push(`\nLive Webhook Events (${events.length} recent):`);
+      events.slice(0, 20).forEach((e) => {
+        parts.push(`  - [${e.eventType}] ${e.summary || e.action || ''} repo=${e.repo || ''} by ${e.sender || ''} at ${e.createdAt || ''}`);
+      });
     }
 
     return parts.length > 0 ? parts.join('\n') : undefined;

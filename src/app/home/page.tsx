@@ -7,6 +7,11 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/components/providers/auth-provider';
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const AnimatedBackground = dynamic(
   () => import('@/components/ui/animated-background').then((m) => m.AnimatedBackground),
@@ -449,6 +454,268 @@ function WhyBullet({ text, index }: { text: string; index: number }) {
   );
 }
 
+/* ─── Pulse AI Q&A Data ─── */
+const PULSE_QA: { question: string; answer: string; isCode?: boolean }[] = [
+  {
+    question: 'How many contributions have I made this year?',
+    answer: 'Based on your contribution graph, you have made **847 contributions** in the past year.\n\n- **Last 30 days:** 112 contributions\n- **Last 7 days:** 28 contributions\n- **Current streak:** 14 consecutive days\n\nYour most active day was March 12 with 23 contributions.',
+  },
+  {
+    question: 'Why did my last Vercel deployment fail?',
+    answer: 'Your latest deployment on **rehanpulse** failed with state `ERROR` on the `feat/chat` branch.\n\nThe build log indicates a **TypeScript compilation error:**\n\n```typescript\n// src/components/chat/chat-panel.tsx\nType \'string | undefined\' is not assignable to type \'string\'.\n  Property \'content\' is possibly undefined.\n\nconst message: ChatMessage = {\n  id: crypto.randomUUID(),\n  role: \"assistant\",\n  content: response.data?.content, // Error here\n  timestamp: Date.now(),\n};\n```\n\nAdd a fallback: `content: response.data?.content ?? ""`',
+  },
+  {
+    question: 'Show me a summary of my open pull requests.',
+    answer: 'You currently have **3 open pull requests**:\n\n- **#42** "feat: add AI chat panel" in `RehanPulse` (ready for review, created 2 days ago)\n- **#38** "fix: SSE reconnection logic" in `RehanPulse` (draft, created 5 days ago)\n- **#15** "chore: upgrade Next.js to 14.3" in `portfolio-site` (ready for review, created 1 week ago)\n\nPR #42 has no conflicts and all checks pass. Consider merging it first.',
+  },
+  {
+    question: 'What is my Vercel bandwidth usage this month?',
+    answer: 'Here is your current billing period usage on the **Hobby** plan:\n\n```bash\n# Vercel Usage Summary\nPlan:          Hobby (Free)\nBandwidth:     1.24 GB / 100 GB\nBuild Minutes: 47 / 6000 min\nRequests:      24,312\nFunction Hours: 0.018 GB-hr\nData Cache:    4.2 MB reads / 1.1 MB writes\n```\n\nYou are well within limits across all metrics. No action needed.',
+  },
+  {
+    question: 'Which of my repos has the most stars?',
+    answer: 'Your top repositories by stars:\n\n| Repository | Stars | Language | Visibility |\n|---|---|---|---|\n| `RehanPulse` | 12 | TypeScript | Public |\n| `portfolio-site` | 8 | TypeScript | Public |\n| `dotfiles` | 3 | Shell | Public |\n| `ml-experiments` | 2 | Python | Private |\n\n**RehanPulse** leads with 12 stars. It also has the most recent activity with 14 commits this week.',
+  },
+];
+
+/* ─── Auto-typing hook for Pulse AI answers ─── */
+function usePulseTyping(text: string, speed = 12) {
+  const [displayed, setDisplayed] = useState('');
+  const [done, setDone] = useState(false);
+  const indexRef = useRef(0);
+
+  useEffect(() => {
+    setDisplayed('');
+    setDone(false);
+    indexRef.current = 0;
+
+    const timer = setInterval(() => {
+      indexRef.current += 1;
+      if (indexRef.current >= text.length) {
+        setDisplayed(text);
+        setDone(true);
+        clearInterval(timer);
+      } else {
+        setDisplayed(text.slice(0, indexRef.current));
+      }
+    }, speed);
+
+    return () => clearInterval(timer);
+  }, [text, speed]);
+
+  return { displayed, done };
+}
+
+/* ─── Markdown renderer for AI showcase ─── */
+function PulseMarkdown({ content }: { content: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+        strong: ({ children }) => <strong className="font-semibold text-black dark:text-white/90">{children}</strong>,
+        ul: ({ children }) => <ul className="list-disc pl-4 mb-2">{children}</ul>,
+        ol: ({ children }) => <ol className="list-decimal pl-4 mb-2">{children}</ol>,
+        li: ({ children }) => <li className="mb-0.5">{children}</li>,
+        code: ({ className, children }) => {
+          const match = /language-(\w+)/.exec(className || '');
+          const codeStr = String(children).replace(/\n$/, '');
+          return match ? (
+            <SyntaxHighlighter
+              style={oneDark}
+              language={match[1]}
+              PreTag="div"
+              customStyle={{
+                margin: '6px 0',
+                padding: '10px 12px',
+                borderRadius: '10px',
+                fontSize: '11.5px',
+                lineHeight: '1.6',
+                background: 'rgba(0,0,0,0.85)',
+              }}
+            >
+              {codeStr}
+            </SyntaxHighlighter>
+          ) : (
+            <code className="bg-black/10 dark:bg-white/10 rounded px-1 py-0.5 text-[11.5px]">{children}</code>
+          );
+        },
+        pre: ({ children }) => <>{children}</>,
+        a: ({ href, children }) => (
+          <a href={href} target="_blank" rel="noopener noreferrer" className="text-[#7079CD] underline underline-offset-2">{children}</a>
+        ),
+        table: ({ children }) => (
+          <div className="overflow-x-auto my-2">
+            <table className="text-[11.5px] border-collapse w-full">{children}</table>
+          </div>
+        ),
+        th: ({ children }) => <th className="border border-gray-300/30 dark:border-white/10 px-2 py-1 text-left font-semibold bg-gray-100/50 dark:bg-white/[0.04]">{children}</th>,
+        td: ({ children }) => <td className="border border-gray-300/30 dark:border-white/10 px-2 py-1">{children}</td>,
+        blockquote: ({ children }) => (
+          <blockquote className="border-l-2 border-[#7079CD]/50 pl-2 my-1 opacity-80">{children}</blockquote>
+        ),
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  );
+}
+
+/* ─── Pulse AI Demo Chat Card ─── */
+function PulseDemoChat({ qa, isActive, onDone }: { qa: typeof PULSE_QA[number]; isActive: boolean; onDone?: () => void }) {
+  const { displayed, done } = usePulseTyping(isActive ? qa.answer : '', 12);
+  const firedRef = useRef(false);
+
+  useEffect(() => {
+    firedRef.current = false;
+  }, [qa]);
+
+  useEffect(() => {
+    if (done && !firedRef.current) {
+      firedRef.current = true;
+      onDone?.();
+    }
+  }, [done, onDone]);
+
+  return (
+    <div className="space-y-3">
+      {/* User message */}
+      <div className="flex justify-end">
+        <div className="max-w-[80%] rounded-xl bg-indigo-500 px-3.5 py-2.5 text-xs leading-relaxed text-white">
+          {qa.question}
+        </div>
+      </div>
+      {/* AI response */}
+      <div className="flex justify-start">
+        <div className="flex gap-2 max-w-[90%]">
+          <div className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#7079CD]/15 overflow-hidden">
+            <div style={{ width: 14, height: 14, filter: 'brightness(0) saturate(100%) invert(48%) sepia(12%) saturate(1600%) hue-rotate(199deg) brightness(92%) contrast(87%)' }}>
+              <DotLottieReact src="/animated-icons/pulse.lottie" loop autoplay style={{ width: 14, height: 14 }} />
+            </div>
+          </div>
+          <div className="rounded-xl bg-white/50 dark:bg-white/[0.06] border border-white/[0.3] dark:border-white/[0.06] px-3.5 py-2.5 text-xs leading-relaxed text-gray-700 dark:text-white/80 overflow-hidden break-words">
+            {isActive && displayed ? (
+              <>
+                <PulseMarkdown content={displayed} />
+                {!done && (
+                  <span className="inline-flex items-center align-middle ml-1" style={{ width: 14, height: 14, filter: 'brightness(0) saturate(100%) invert(48%) sepia(12%) saturate(1600%) hue-rotate(199deg) brightness(92%) contrast(87%)' }}>
+                    <DotLottieReact src="/animated-icons/pulse.lottie" loop autoplay style={{ width: 14, height: 14 }} />
+                  </span>
+                )}
+              </>
+            ) : (
+              <span className="text-gray-400 dark:text-white/20">...</span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── PulseAI Showcase Section ─── */
+function PulseAIShowcase() {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearTimer = useCallback(() => {
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+  }, []);
+
+  // Called when typing finishes — wait 3s then advance
+  const handleTypingDone = useCallback(() => {
+    clearTimer();
+    timerRef.current = setTimeout(() => {
+      setActiveIndex((prev) => (prev + 1) % PULSE_QA.length);
+    }, 3000);
+  }, [clearTimer]);
+
+  useEffect(() => {
+    return () => clearTimer();
+  }, [clearTimer]);
+
+  const handleDotClick = useCallback((i: number) => {
+    clearTimer();
+    setActiveIndex(i);
+  }, [clearTimer]);
+
+  const qa = PULSE_QA[activeIndex]!;
+
+  return (
+    <div className="space-y-6">
+      {/* Intro card */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.5, ease }}
+        className="rounded-2xl border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] px-8 py-8 text-center"
+      >
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#7079CD]/10 overflow-hidden">
+          <div style={{ filter: 'brightness(0) saturate(100%) invert(48%) sepia(12%) saturate(1600%) hue-rotate(199deg) brightness(92%) contrast(87%)' }}>
+            <DotLottieReact src="/animated-icons/pulse.lottie" loop autoplay style={{ width: 36, height: 36 }} />
+          </div>
+        </div>
+        <h2 className="text-2xl font-bold sm:text-3xl">
+          Meet <span style={{ color: '#7079CD' }}>Pulse AI</span>
+        </h2>
+        <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-black dark:text-white/45">
+          Your intelligent assistant that understands your entire dashboard. Ask about contributions, deployments, pull requests, usage, and more. Pulse AI analyzes your live data and responds with actionable insights.
+        </p>
+      </motion.div>
+
+      {/* Chat demo card */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.5, delay: 0.1, ease }}
+        className="rounded-2xl border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] overflow-hidden"
+      >
+        {/* Chat header */}
+        <div className="flex items-center gap-2 border-b border-white/[0.18] dark:border-white/[0.06] px-5 py-3">
+          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#7079CD]/15 overflow-hidden">
+            <div style={{ width: 14, height: 14, filter: 'brightness(0) saturate(100%) invert(48%) sepia(12%) saturate(1600%) hue-rotate(199deg) brightness(92%) contrast(87%)' }}>
+              <DotLottieReact src="/animated-icons/pulse.lottie" loop autoplay style={{ width: 14, height: 14 }} />
+            </div>
+          </div>
+          <span className="text-xs font-semibold text-gray-900 dark:text-white">Pulse AI</span>
+          <span className="text-[10px] text-[#7079CD] animate-pulse">live demo</span>
+        </div>
+
+        {/* Chat body */}
+        <div className="px-5 py-5 min-h-[280px]">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeIndex}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.25, ease }}
+            >
+              <PulseDemoChat qa={qa} isActive={true} onDone={handleTypingDone} />
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* Pagination dots */}
+        <div className="flex items-center justify-center gap-2 border-t border-white/[0.18] dark:border-white/[0.06] px-5 py-3">
+          {PULSE_QA.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => handleDotClick(i)}
+              className={`h-1.5 rounded-full transition-all duration-300 ${
+                i === activeIndex ? 'w-6 bg-[#7079CD]' : 'w-1.5 bg-gray-300 dark:bg-white/15 hover:bg-gray-400 dark:hover:bg-white/25'
+              }`}
+              aria-label={`Show question ${i + 1}`}
+            />
+          ))}
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════════════
    Homepage
    ═══════════════════════════════════════════════════ */
@@ -689,6 +956,13 @@ export default function HomePage() {
             <p className="mt-3 text-sm text-black dark:text-white/40">See your entire development workflow at a glance.</p>
           </div>
           <DashboardPreview />
+        </div>
+      </Section>
+
+      {/* ─── Pulse AI Showcase ─── */}
+      <Section className="py-24">
+        <div id="pulse-ai" className="scroll-mt-20">
+          <PulseAIShowcase />
         </div>
       </Section>
 

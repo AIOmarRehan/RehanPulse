@@ -18,6 +18,7 @@ import {
 } from '@/components/pages';
 import { CommandPalette, type SpotlightAction } from '@/components/spotlight/command-palette';
 import { ChatPanel } from '@/components/chat/chat-panel';
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 
 const NAV_ITEMS = [
   { darkIcon: '/macos-icons/activity-timeline.png', lightIcon: '/macos-icons/activity-timeline.png', label: 'Dashboard', id: 'dashboard' },
@@ -602,19 +603,16 @@ export function AppShell() {
         <button
           onClick={() => setChatOpen(true)}
           aria-label="Open AI chat"
-          className="fixed bottom-4 right-4 z-[70] flex h-11 w-11 items-center justify-center rounded-full bg-indigo-500 text-white shadow-lg shadow-indigo-500/25 transition-all hover:scale-105 hover:shadow-indigo-500/40 active:scale-95"
+          className="fixed bottom-4 right-4 z-[70] flex h-11 w-11 items-center justify-center rounded-full bg-[#7079CD] text-white shadow-lg shadow-[#7079CD]/25 transition-all hover:scale-105 hover:shadow-[#7079CD]/40 active:scale-95 overflow-hidden"
         >
-          <svg
-            viewBox="0 0 24 24"
-            className="h-5 w-5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-          </svg>
+          <div style={{ filter: 'brightness(0) invert(1)' }}>
+            <DotLottieReact
+              src="/animated-icons/pulse.lottie"
+              loop
+              autoplay
+              style={{ width: 26, height: 26 }}
+            />
+          </div>
         </button>
       )}
     </div>

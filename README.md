@@ -1,5 +1,9 @@
 # RehanPulse
 
+<p align="center">
+  <video src="intro-vidoe/Recording 2026-03-29 072643.webm" autoplay loop muted playsinline width="100%"></video>
+</p>
+
 A real-time developer activity dashboard built with Next.js 14, Firebase, and multiple third-party API integrations. RehanPulse consolidates GitHub activity, Vercel deployment metrics, and Firebase project data into a single, unified interface with live updates and configurable alerting.
 
 ![Next.js](https://img.shields.io/badge/Next.js-14-black) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue) ![Firebase](https://img.shields.io/badge/Firebase-Auth%20%2B%20Firestore-orange) ![Tailwind](https://img.shields.io/badge/Tailwind%20CSS-3.4-38bdf8)

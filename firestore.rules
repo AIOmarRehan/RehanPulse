@@ -6,6 +6,12 @@ service cloud.firestore {
     // Users can only read/write their own user document
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // Chat conversations subcollection (Admin SDK writes, user can read)
+      match /chat_conversations/{convId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow write: if false; // Only Admin SDK writes
+      }
     }
 
     // Webhook events: users can read, but only Admin SDK can write

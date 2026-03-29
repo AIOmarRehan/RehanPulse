@@ -739,7 +739,10 @@ export default function HomePage() {
   const [mounted, setMounted] = useState(false);
   const [navLottiePop, setNavLottiePop] = useState(false);
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    setMounted(true);
+  }, []);
 
   const goLogin = useCallback(() => router.push('/login'), [router]);
   const goDashboard = useCallback(() => router.push('/'), [router]);

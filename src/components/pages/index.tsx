@@ -549,6 +549,18 @@ export function DashboardContent({ userName }: { userName?: string }) {
   const [refreshing, setRefreshing] = useState(false);
   const clearEvents = useEventStore((s) => s.clearEvents);
 
+  const totalCommits = useMemo(() => {
+    if (!data?.repos) return 0;
+    return data.repos.reduce((sum, r) => sum + (r.commit_count ?? 0), 0);
+  }, [data?.repos]);
+
+  const dashboardWidgets = useMemo<WidgetConfig[]>(() => DASHBOARD_WIDGETS.map((w) => {
+    if (w.id === 'commits' && totalCommits > 0) {
+      return { ...w, title: <span>Recent Commits <span className="ml-1.5 text-[10px] font-normal text-indigo-400">{totalCommits.toLocaleString()} total</span></span> };
+    }
+    return w;
+  }), [totalCommits]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     clearEvents();
@@ -616,7 +628,7 @@ export function DashboardContent({ userName }: { userName?: string }) {
         </div>
       </motion.div>
 
-      <WidgetGrid widgets={DASHBOARD_WIDGETS} renderWidget={renderWidget} />
+      <WidgetGrid widgets={dashboardWidgets} renderWidget={renderWidget} />
     </>
   );
 }
@@ -641,6 +653,11 @@ export function GitHubContent() {
   const { refresh: refreshNotifications } = useNotifications();
   const [refreshing, setRefreshing] = useState(false);
   const clearEvents = useEventStore((s) => s.clearEvents);
+
+  const totalCommits = useMemo(() => {
+    if (!data?.repos) return 0;
+    return data.repos.reduce((sum, r) => sum + (r.commit_count ?? 0), 0);
+  }, [data?.repos]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -721,6 +738,12 @@ export function GitHubContent() {
                       {repo.language}
                     </span>
                   )}
+                  {repo.commit_count > 0 && (
+                    <span className="flex items-center gap-1">
+                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><line x1="1.05" y1="12" x2="7" y2="12"/><line x1="17.01" y1="12" x2="22.96" y2="12"/></svg>
+                      {repo.commit_count.toLocaleString()} commits
+                    </span>
+                  )}
                   <span>Updated {new Date(repo.updated_at).toLocaleDateString()}</span>
                 </div>
               </a>
@@ -732,7 +755,7 @@ export function GitHubContent() {
       {/* Commits */}
       <motion.div {...fadeIn} transition={{ delay: 0.2 }} className="mb-6">
         <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-white/30">
-          Recent Commits
+          Recent Commits{totalCommits > 0 && <span className="ml-1.5 normal-case text-[10px] font-normal text-indigo-400">{totalCommits.toLocaleString()} total</span>}
         </h3>
         {isLoading ? (
           <div className="space-y-2">

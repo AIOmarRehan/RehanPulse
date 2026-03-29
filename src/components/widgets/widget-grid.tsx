@@ -7,7 +7,7 @@ import { WidgetErrorBoundary } from './widget-error-boundary';
 /* ─── Types ─── */
 export interface WidgetConfig {
   id: string;
-  title: string;
+  title: string | React.ReactNode;
   icon: React.ReactNode;
   colSpan?: 1 | 2;
   rowSpan?: 1 | 2;

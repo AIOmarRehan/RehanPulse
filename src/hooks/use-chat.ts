@@ -134,39 +134,58 @@ export function useChat() {
   const gatherContext = useCallback(() => {
     const parts: string[] = [];
 
-    // GitHub data
+    // GitHub data — send EVERYTHING, no slicing
     const github = queryClient.getQueryData<Record<string, unknown>>(['github-data']);
     if (github) {
       const repos = github.repos as Array<Record<string, unknown>> | undefined;
       if (repos) {
-        parts.push(`GitHub Repositories (${repos.length} total):`);
-        repos.slice(0, 15).forEach((r) => {
+        const totalCommitsAllRepos = repos.reduce((sum, r) => sum + ((r.commit_count as number) ?? 0), 0);
+        const totalStars = repos.reduce((sum, r) => sum + ((r.stargazers_count as number) ?? 0), 0);
+        const publicCount = repos.filter((r) => !r.private).length;
+        const privateCount = repos.filter((r) => r.private).length;
+        const langMap: Record<string, number> = {};
+        repos.forEach((r) => {
+          const lang = (r.language as string) || 'Unknown';
+          langMap[lang] = (langMap[lang] || 0) + 1;
+        });
+        const topLangs = Object.entries(langMap).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([l, c]) => `${l}(${c})`).join(', ');
+
+        parts.push(`GitHub Repositories (${repos.length} total, ${publicCount} public, ${privateCount} private, ${totalStars} total stars, ${totalCommitsAllRepos.toLocaleString()} total commits):`);
+        parts.push(`  Top languages: ${topLangs}`);
+        repos.forEach((r) => {
+          const desc = (r.description as string) ? ` — "${(r.description as string).slice(0, 120)}"` : '';
+          const updated = r.updated_at ? `, updated ${new Date(r.updated_at as string).toISOString().slice(0, 10)}` : '';
+          const url = r.html_url ? `, url: ${r.html_url}` : '';
           parts.push(
-            `  - ${r.full_name}: ${r.stargazers_count ?? 0} stars, ${r.language || 'N/A'}, ${r.visibility}, ${r.open_issues_count ?? 0} open issues`,
+            `  - ${r.full_name}: ${r.stargazers_count ?? 0}★, ${r.language || 'N/A'}, ${r.private ? 'private' : 'public'}, ${r.open_issues_count ?? 0} open issues, ${((r.commit_count as number) ?? 0).toLocaleString()} commits, forks: ${r.forks_count ?? 0}${desc}${updated}${url}`,
           );
         });
       }
 
       const commits = github.commits as Array<Record<string, unknown>> | undefined;
       if (commits) {
-        parts.push(`\nRecent Commits This Week (${commits.length}):`);
-        commits.slice(0, 10).forEach((c) => {
-          const msg = (c.commit as Record<string, unknown>)?.message as string | undefined;
+        parts.push(`\nRecent Commits This Week (${commits.length} total):`);
+        commits.forEach((c) => {
+          const msg = (c.message as string) ?? 'No message';
+          const fullMsg = msg.split('\n')[0];
+          const body = msg.split('\n').slice(1).join(' ').trim();
           parts.push(
-            `  - ${msg?.split('\n')[0] || 'No message'} (${c.repository || ''}) by ${c.author || 'unknown'} at ${c.date || ''}`,
+            `  - ${fullMsg} (repo: ${c.repo || ''}) by ${c.author || 'unknown'} at ${c.date || ''} [SHA: ${(c.sha as string)?.slice(0, 7) || ''}]${body ? ` body: "${body.slice(0, 200)}"` : ''}`,
           );
         });
       }
 
       const prs = github.pullRequests as Array<Record<string, unknown>> | undefined;
       if (prs) {
-        parts.push(`\nOpen Pull Requests (${prs.length}):`);
-        prs.slice(0, 10).forEach((pr) => {
-          parts.push(`  - #${pr.number} "${pr.title}" in ${pr.repository} by ${pr.author || 'unknown'} (${pr.draft ? 'draft' : 'ready'}, created ${pr.created_at || ''})`);
+        parts.push(`\nOpen Pull Requests (${prs.length} total):`);
+        prs.forEach((pr) => {
+          const labels = pr.labels as string[] | undefined;
+          const labelStr = labels?.length ? ` labels: [${labels.join(', ')}]` : '';
+          parts.push(`  - #${pr.number} "${pr.title}" in ${pr.repo || ''} by ${pr.author || 'unknown'} (${pr.draft ? 'draft' : 'ready'}, created ${pr.created_at || ''}, updated ${pr.updated_at || ''})${labelStr}`);
         });
       }
 
-      // Contribution data
+      // Contribution data — full stats
       const contributions = github.contributions as Array<{ date: string; contributionCount: number }> | undefined;
       if (contributions && contributions.length > 0) {
         const totalContributions = contributions.reduce((sum, d) => sum + d.contributionCount, 0);
@@ -175,25 +194,46 @@ export function useChat() {
         const last7 = contributions.slice(-7);
         const last7Total = last7.reduce((sum, d) => sum + d.contributionCount, 0);
         const today = contributions[contributions.length - 1];
+
+        // Streak calculation
+        const reversed = [...contributions].reverse();
+        const streakDays = reversed.findIndex((d) => d.contributionCount === 0);
+
+        // Best day
+        const bestDay = contributions.reduce<{ date: string; contributionCount: number } | undefined>((best, d) => !best || d.contributionCount > best.contributionCount ? d : best, undefined);
+
+        // Average
+        const activeDays = contributions.filter((d) => d.contributionCount > 0).length;
+        const avgPerActiveDay = activeDays > 0 ? (totalContributions / activeDays).toFixed(1) : '0';
+
         parts.push(`\nContributions (past year):`);
         parts.push(`  - Total: ${totalContributions} contributions in the past year`);
+        parts.push(`  - Active days: ${activeDays} out of ${contributions.length} days`);
+        parts.push(`  - Average per active day: ${avgPerActiveDay}`);
         parts.push(`  - Last 30 days: ${last30Total} contributions`);
         parts.push(`  - Last 7 days: ${last7Total} contributions`);
         parts.push(`  - Today: ${today?.contributionCount ?? 0} contributions`);
-        const streakDays = [...contributions].reverse().findIndex((d) => d.contributionCount === 0);
         if (streakDays > 0) {
           parts.push(`  - Current streak: ${streakDays} consecutive days`);
         }
+        if (bestDay) {
+          parts.push(`  - Best day: ${bestDay.date} with ${bestDay.contributionCount} contributions`);
+        }
+
+        // Last 14 days daily breakdown
+        const last14 = contributions.slice(-14);
+        parts.push(`  - Last 14 days: ${last14.map((d) => `${d.date.slice(5)}:${d.contributionCount}`).join(', ')}`);
       }
 
       // Rate limit
       const rateLimit = github.rateLimit as { limit?: number; remaining?: number; used?: number } | undefined;
       if (rateLimit) {
-        parts.push(`\nGitHub API Rate Limit: ${rateLimit.remaining ?? '?'}/${rateLimit.limit ?? '?'} remaining (${rateLimit.used ?? '?'} used)`);
+        const pct = rateLimit.limit ? Math.round(((rateLimit.used ?? 0) / rateLimit.limit) * 100) : 0;
+        parts.push(`\nGitHub API Rate Limit: ${rateLimit.remaining ?? '?'}/${rateLimit.limit ?? '?'} remaining (${rateLimit.used ?? '?'} used, ${pct}% consumed)`);
       }
     }
 
-    // Vercel data
+    // Vercel data — send ALL deployments, all usage fields
     const vercelQueries = queryClient.getQueriesData<Record<string, unknown>>({
       queryKey: ['vercel-data'],
     });
@@ -201,13 +241,23 @@ export function useChat() {
     if (vercel) {
       const deployments = vercel.deployments as Array<Record<string, unknown>> | undefined;
       if (deployments) {
-        parts.push(`\nVercel Deployments (${deployments.length}):`);
-        deployments.slice(0, 8).forEach((d) => {
+        const readyCount = deployments.filter((d) => d.state === 'READY').length;
+        const errorCount = deployments.filter((d) => d.state === 'ERROR').length;
+        const canceledCount = deployments.filter((d) => d.state === 'CANCELED').length;
+        const buildingCount = deployments.filter((d) => d.state === 'BUILDING').length;
+        const successRate = deployments.length > 0 ? Math.round((readyCount / deployments.length) * 100) : 0;
+
+        parts.push(`\nVercel Deployments (${deployments.length} total, ${readyCount} ready, ${errorCount} errors, ${canceledCount} canceled, ${buildingCount} building, ${successRate}% success rate):`);
+        deployments.forEach((d) => {
           const created = d.createdAt ? new Date(d.createdAt as number).toISOString() : '';
           const meta = d.meta as Record<string, unknown> | undefined;
           const commitMsg = meta?.githubCommitMessage || '';
+          const branch = meta?.githubCommitRef || '';
+          const buildStart = d.buildingAt as number | undefined;
+          const readyAt = d.ready as number | undefined;
+          const duration = buildStart && readyAt ? `${Math.round((readyAt - buildStart) / 1000)}s` : '';
           parts.push(
-            `  - ${d.name}: ${d.state} (${d.target || 'preview'}) - ${d.url || 'no URL'} ${commitMsg ? `[commit: ${commitMsg}]` : ''} ${created}`,
+            `  - ${d.name}: ${d.state} (${d.target || 'preview'}) url=${d.url || 'none'}${branch ? ` branch=${branch}` : ''} ${commitMsg ? `commit="${(commitMsg as string).slice(0, 100)}"` : ''} ${duration ? `build=${duration}` : ''} ${created}`,
           );
         });
       }
@@ -217,8 +267,9 @@ export function useChat() {
         parts.push(`\nVercel Projects (${projects.length}):`);
         projects.forEach((p) => {
           const domains = p.domains as string[] | undefined;
+          const updated = p.updatedAt ? `, updated ${new Date(p.updatedAt as number).toISOString().slice(0, 10)}` : '';
           parts.push(
-            `  - ${p.name}: framework=${p.framework || 'N/A'}, latestState=${p.latestDeploymentState || 'N/A'}${domains?.length ? `, domains=[${domains.join(', ')}]` : ''}`,
+            `  - ${p.name}: framework=${p.framework || 'N/A'}, latestState=${p.latestDeploymentState || 'N/A'}${domains?.length ? `, domains=[${domains.join(', ')}]` : ''}${updated}`,
           );
         });
       }
@@ -227,9 +278,12 @@ export function useChat() {
       if (usage) {
         parts.push(`\nVercel Usage (current billing period):`);
         parts.push(`  - Plan: ${usage.subscription || 'unknown'}`);
-        if (usage.requests != null) parts.push(`  - Requests: ${usage.requests}`);
-        if (usage.bandwidth != null) parts.push(`  - Bandwidth: ${((usage.bandwidth as number) / (1024 * 1024 * 1024)).toFixed(2)} GB`);
+        if (usage.requests != null) parts.push(`  - Requests: ${(usage.requests as number).toLocaleString()}`);
+        if (usage.bandwidth != null) parts.push(`  - Bandwidth: ${((usage.bandwidth as number) / (1024 * 1024 * 1024)).toFixed(3)} GB`);
         if (usage.buildMinutes != null) parts.push(`  - Build minutes: ${usage.buildMinutes}`);
+        if (usage.functionGBHours != null) parts.push(`  - Function GB-hours: ${usage.functionGBHours}`);
+        if (usage.dataCacheReads != null) parts.push(`  - Data cache reads: ${((usage.dataCacheReads as number) / (1024 * 1024)).toFixed(2)} MB`);
+        if (usage.dataCacheWrites != null) parts.push(`  - Data cache writes: ${((usage.dataCacheWrites as number) / (1024 * 1024)).toFixed(2)} MB`);
       }
     }
 
@@ -241,6 +295,13 @@ export function useChat() {
       parts.push(
         `\nFirebase: ${firebaseConn.connected ? 'Connected' : 'Disconnected'} - Project: ${firebaseConn.projectId || 'N/A'}`,
       );
+      const collections = firebaseConn.collections as Array<{ name: string; documentCount: number }> | undefined;
+      if (collections && collections.length > 0) {
+        parts.push(`  Collections (${collections.length}):`);
+        collections.forEach((c) => {
+          parts.push(`    - ${c.name}: ${c.documentCount} documents`);
+        });
+      }
     }
 
     const firebaseProjects = queryClient.getQueryData<Record<string, unknown>[]>(['firebase-projects']);
@@ -248,12 +309,13 @@ export function useChat() {
       parts.push(`Firebase Projects: ${firebaseProjects.map((p) => p.displayName || p.projectId).join(', ')}`);
     }
 
-    // Alerts
+    // Alerts — all rules
     const alerts = queryClient.getQueryData<Record<string, unknown>>(['alert-rules']);
     if (alerts) {
       const rules = alerts.rules as Array<Record<string, unknown>> | undefined;
       if (rules) {
-        parts.push(`\nAlert Rules (${rules.length}):`);
+        const activeCount = rules.filter((r) => r.enabled).length;
+        parts.push(`\nAlert Rules (${rules.length} total, ${activeCount} active):`);
         rules.forEach((a) => {
           parts.push(
             `  - "${a.name}": ${a.enabled ? 'Active' : 'Disabled'} (type: ${a.eventType || a.type})`,
@@ -262,17 +324,34 @@ export function useChat() {
       }
     }
 
-    // Notifications
+    // Notifications — ALL of them
     const notifs = queryClient.getQueryData<Record<string, unknown>>(['notifications']);
     if (notifs) {
       const list = notifs.notifications as Array<Record<string, unknown>> | undefined;
       if (list && list.length > 0) {
         const unread = list.filter((n) => !n.read).length;
         parts.push(`\nNotifications (${list.length} total, ${unread} unread):`);
-        list.slice(0, 8).forEach((n) => {
-          parts.push(`  - [${n.severity}] ${n.message} (${n.read ? 'read' : 'unread'}, ${n.eventType || ''})`);
+        list.forEach((n) => {
+          const time = n.createdAt ? new Date(n.createdAt as number).toISOString() : '';
+          parts.push(`  - [${n.severity}] ${n.message} (${n.read ? 'read' : 'unread'}, type=${n.eventType || ''}, ${time})`);
         });
       }
+    }
+
+    // SSE live events from event store
+    try {
+      const eventStoreModule = require('@/lib/stores/event-store');
+      if (eventStoreModule?.useEventStore) {
+        const events = eventStoreModule.useEventStore.getState()?.events;
+        if (events && Array.isArray(events) && events.length > 0) {
+          parts.push(`\nLive Webhook Events (${events.length} recent):`);
+          events.slice(0, 20).forEach((e: Record<string, unknown>) => {
+            parts.push(`  - [${e.eventType}] ${e.message || e.action || ''} at ${e.timestamp || ''}`);
+          });
+        }
+      }
+    } catch {
+      // event store not available, skip
     }
 
     return parts.length > 0 ? parts.join('\n') : undefined;

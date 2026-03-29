@@ -32,6 +32,7 @@ export interface GitHubRepo {
   updated_at: string;
   html_url: string;
   private: boolean;
+  commit_count: number;
 }
 
 export interface GitHubCommit {
@@ -71,6 +72,45 @@ export interface ContributionDay {
 
 /* ─── Data Fetchers ─── */
 
+/** Fetch total commit counts for repos using GraphQL (batched, single request). */
+async function fetchRepoCommitCounts(
+  octokit: Octokit,
+  repos: { full_name: string }[],
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  if (repos.length === 0) return counts;
+
+  // Build a single GraphQL query with aliased fields for each repo
+  const fragments = repos.map((r, i) => {
+    const [owner, name] = r.full_name.split('/');
+    return `repo${i}: repository(owner: "${owner}", name: "${name}") {
+      defaultBranchRef {
+        target {
+          ... on Commit {
+            history {
+              totalCount
+            }
+          }
+        }
+      }
+    }`;
+  });
+
+  const query = `query { ${fragments.join('\n')} }`;
+
+  const result = await octokit.graphql<Record<string, {
+    defaultBranchRef: { target: { history: { totalCount: number } } } | null;
+  } | null>>(query);
+
+  repos.forEach((r, i) => {
+    const repoData = result[`repo${i}`];
+    const total = repoData?.defaultBranchRef?.target?.history?.totalCount ?? 0;
+    counts.set(r.full_name, total);
+  });
+
+  return counts;
+}
+
 /** Fetch the user's repositories (up to 30, sorted by push date). */
 export async function fetchUserRepos(octokit: Octokit): Promise<GitHubRepo[]> {
   const { data } = await octokit.rest.repos.listForAuthenticatedUser({
@@ -79,7 +119,7 @@ export async function fetchUserRepos(octokit: Octokit): Promise<GitHubRepo[]> {
     type: 'owner',
   });
 
-  return data.map((r) => ({
+  const baseRepos = data.map((r) => ({
     id: r.id,
     name: r.name,
     full_name: r.full_name,
@@ -90,7 +130,20 @@ export async function fetchUserRepos(octokit: Octokit): Promise<GitHubRepo[]> {
     updated_at: r.updated_at ?? new Date().toISOString(),
     html_url: r.html_url,
     private: r.private,
+    commit_count: 0,
   }));
+
+  // Fetch commit counts via GraphQL in a single request
+  try {
+    const counts = await fetchRepoCommitCounts(octokit, baseRepos);
+    for (const repo of baseRepos) {
+      repo.commit_count = counts.get(repo.full_name) ?? 0;
+    }
+  } catch {
+    // If GraphQL fails, leave counts as 0
+  }
+
+  return baseRepos;
 }
 
 /** Fetch recent commits across the user's top repos. */

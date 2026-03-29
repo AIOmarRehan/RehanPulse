@@ -31,7 +31,7 @@ const HERO_SENTENCES: [string, string][] = [
   ['Your codebase,', ' live and fully observable.'],
 ];
 
-function useTypewriter(sentences: [string, string][], typingSpeed = 45, deletingSpeed = 25, pauseTime = 2200) {
+function useTypewriter(sentences: [string, string][], typingMs = 30, deleteMs = 15, pauseMs = 2000) {
   const [sentenceIndex, setSentenceIndex] = useState(0);
   const [charIndex, setCharIndex] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -40,21 +40,34 @@ function useTypewriter(sentences: [string, string][], typingSpeed = 45, deleting
   const splitPoint = sentences[sentenceIndex]![0].length;
 
   useEffect(() => {
+    let rafId: number;
+    let lastTime = 0;
+    const interval = isDeleting ? deleteMs : typingMs;
+
+    // Pause at full sentence before deleting
     if (!isDeleting && charIndex === fullText.length) {
-      const timeout = setTimeout(() => setIsDeleting(true), pauseTime);
+      const timeout = setTimeout(() => setIsDeleting(true), pauseMs);
       return () => clearTimeout(timeout);
     }
+    // Advance to next sentence after fully deleted
     if (isDeleting && charIndex === 0) {
       setIsDeleting(false);
       setSentenceIndex((prev) => (prev + 1) % sentences.length);
       return;
     }
-    const speed = isDeleting ? deletingSpeed : typingSpeed;
-    const timeout = setTimeout(() => {
-      setCharIndex((prev) => prev + (isDeleting ? -1 : 1));
-    }, speed);
-    return () => clearTimeout(timeout);
-  }, [charIndex, isDeleting, fullText.length, sentences.length, typingSpeed, deletingSpeed, pauseTime]);
+
+    const step = (time: number) => {
+      if (!lastTime) lastTime = time;
+      if (time - lastTime >= interval) {
+        lastTime = time;
+        setCharIndex((prev) => prev + (isDeleting ? -1 : 1));
+      } else {
+        rafId = requestAnimationFrame(step);
+      }
+    };
+    rafId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(rafId);
+  }, [charIndex, isDeleting, fullText.length, sentences.length, typingMs, deleteMs, pauseMs]);
 
   const displayed = fullText.slice(0, charIndex);
   const firstPart = displayed.slice(0, Math.min(charIndex, splitPoint));
@@ -353,7 +366,7 @@ function FeatureCard({ darkIcon, lightIcon, title, desc, index }: { darkIcon: st
   return (
     <motion.div
       ref={cardRef}
-      variants={{ initial: { opacity: 0, y: 24 }, animate: { opacity: 1, y: 0, transition: { duration: 0.5, delay: index * 0.08, ease } } }}
+      variants={{ initial: { y: 24 }, animate: { y: 0, transition: { duration: 0.5, delay: index * 0.08, ease } } }}
       whileHover={{ y: -4, transition: { duration: 0.2 } }}
       className="group relative overflow-hidden rounded-2xl border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] backdrop-saturate-[180%] p-6 shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] transition-shadow hover:shadow-lg hover:shadow-indigo-500/5"
     >
@@ -381,8 +394,8 @@ function Section({ children, className = '' }: { children: React.ReactNode; clas
   return (
     <motion.section
       ref={ref}
-      initial={{ opacity: 0, y: 32 }}
-      animate={inView ? { opacity: 1, y: 0 } : {}}
+      initial={{ y: 32 }}
+      animate={inView ? { y: 0 } : {}}
       transition={{ duration: 0.6, ease }}
       className={`relative mx-auto max-w-5xl px-6 ${className}`}
     >
@@ -398,8 +411,8 @@ function Step({ num, title, desc, isLast }: { num: number; title: string; desc: 
   return (
     <motion.div
       ref={ref}
-      initial={{ opacity: 0, x: -24 }}
-      animate={inView ? { opacity: 1, x: 0 } : {}}
+      initial={{ x: -24 }}
+      animate={inView ? { x: 0 } : {}}
       transition={{ duration: 0.5, ease }}
       className="relative flex gap-5"
     >
@@ -439,8 +452,8 @@ function WhyBullet({ text, index }: { text: string; index: number }) {
   return (
     <motion.li
       ref={ref}
-      initial={{ opacity: 0, x: -16 }}
-      animate={inView ? { opacity: 1, x: 0 } : {}}
+      initial={{ x: -16 }}
+      animate={inView ? { x: 0 } : {}}
       transition={{ duration: 0.4, delay: index * 0.1, ease }}
       className="flex items-center gap-3 text-sm text-black dark:text-white/50 rounded-xl border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_4px_20px_rgba(100,120,200,0.06)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.15)] px-4 py-3"
     >
@@ -589,7 +602,7 @@ function PulseDemoChat({ qa, isActive, onDone }: { qa: typeof PULSE_QA[number]; 
       <div className="flex justify-start">
         <div className="flex gap-2 max-w-[90%]">
           <div className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#7079CD]/15 overflow-hidden">
-            <div style={{ width: 14, height: 14, filter: 'brightness(0) saturate(100%) invert(48%) sepia(12%) saturate(1600%) hue-rotate(199deg) brightness(92%) contrast(87%)' }}>
+            <div className="h-3.5 w-3.5" style={{ filter: 'brightness(0) saturate(100%) invert(48%) sepia(12%) saturate(1600%) hue-rotate(199deg) brightness(92%) contrast(87%)' }}>
               <DotLottieReact src="/animated-icons/pulse.lottie" loop autoplay style={{ width: 14, height: 14 }} />
             </div>
           </div>
@@ -598,7 +611,7 @@ function PulseDemoChat({ qa, isActive, onDone }: { qa: typeof PULSE_QA[number]; 
               <>
                 <PulseMarkdown content={displayed} />
                 {!done && (
-                  <span className="inline-flex items-center align-middle ml-1" style={{ width: 14, height: 14, filter: 'brightness(0) saturate(100%) invert(48%) sepia(12%) saturate(1600%) hue-rotate(199deg) brightness(92%) contrast(87%)' }}>
+                  <span className="inline-flex h-3.5 w-3.5 items-center align-middle ml-1" style={{ filter: 'brightness(0) saturate(100%) invert(48%) sepia(12%) saturate(1600%) hue-rotate(199deg) brightness(92%) contrast(87%)' }}>
                     <DotLottieReact src="/animated-icons/pulse.lottie" loop autoplay style={{ width: 14, height: 14 }} />
                   </span>
                 )}
@@ -645,14 +658,14 @@ function PulseAIShowcase() {
     <div className="space-y-6">
       {/* Intro card */}
       <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        whileInView={{ opacity: 1, y: 0 }}
+        initial={{ y: 16 }}
+        whileInView={{ y: 0 }}
         viewport={{ once: true }}
         transition={{ duration: 0.5, ease }}
         className="rounded-2xl border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] px-8 py-8 text-center"
       >
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#7079CD]/10 overflow-hidden">
-          <div style={{ filter: 'brightness(0) saturate(100%) invert(48%) sepia(12%) saturate(1600%) hue-rotate(199deg) brightness(92%) contrast(87%)' }}>
+          <div className="h-9 w-9" style={{ filter: 'brightness(0) saturate(100%) invert(48%) sepia(12%) saturate(1600%) hue-rotate(199deg) brightness(92%) contrast(87%)' }}>
             <DotLottieReact src="/animated-icons/pulse.lottie" loop autoplay style={{ width: 36, height: 36 }} />
           </div>
         </div>
@@ -666,8 +679,8 @@ function PulseAIShowcase() {
 
       {/* Chat demo card */}
       <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        whileInView={{ opacity: 1, y: 0 }}
+        initial={{ y: 16 }}
+        whileInView={{ y: 0 }}
         viewport={{ once: true }}
         transition={{ duration: 0.5, delay: 0.1, ease }}
         className="rounded-2xl border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] overflow-hidden"
@@ -675,7 +688,7 @@ function PulseAIShowcase() {
         {/* Chat header */}
         <div className="flex items-center gap-2 border-b border-white/[0.18] dark:border-white/[0.06] px-5 py-3">
           <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#7079CD]/15 overflow-hidden">
-            <div style={{ width: 14, height: 14, filter: 'brightness(0) saturate(100%) invert(48%) sepia(12%) saturate(1600%) hue-rotate(199deg) brightness(92%) contrast(87%)' }}>
+            <div className="h-3.5 w-3.5" style={{ filter: 'brightness(0) saturate(100%) invert(48%) sepia(12%) saturate(1600%) hue-rotate(199deg) brightness(92%) contrast(87%)' }}>
               <DotLottieReact src="/animated-icons/pulse.lottie" loop autoplay style={{ width: 14, height: 14 }} />
             </div>
           </div>
@@ -780,6 +793,7 @@ export default function HomePage() {
             <a href="#features" className="transition-colors hover:text-black dark:hover:text-white/80">Features</a>
             <a href="#how-it-works" className="transition-colors hover:text-black dark:hover:text-white/80">How It Works</a>
             <a href="#demo" className="transition-colors hover:text-black dark:hover:text-white/80">Demo</a>
+            <a href="#pulse-ai" className="transition-colors hover:text-black dark:hover:text-white/80">Pulse AI</a>
           </div>
 
           <div className="flex items-center gap-3">
@@ -833,7 +847,7 @@ export default function HomePage() {
 
           <div className="mx-auto max-w-5xl px-6 text-center">
             <div className="mx-auto mb-8 max-w-3xl rounded-2xl border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] px-10 py-8">
-            <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease }}>
+            <motion.div initial={{ y: 24 }} animate={{ y: 0 }} transition={{ duration: 0.6, ease }}>
               <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
                 Your Developer Activity,{' '}
                 <span className="bg-gradient-to-r from-indigo-500 to-violet-500 bg-clip-text text-transparent">
@@ -850,8 +864,8 @@ export default function HomePage() {
             </div>
 
             <motion.p
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ y: 16 }}
+              animate={{ y: 0 }}
               transition={{ duration: 0.5, delay: 0.15, ease }}
               className="mx-auto mt-5 max-w-2xl text-sm leading-relaxed text-black dark:text-white/45 sm:text-base"
             >
@@ -859,8 +873,8 @@ export default function HomePage() {
             </motion.p>
 
             <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ y: 12 }}
+              animate={{ y: 0 }}
               transition={{ duration: 0.5, delay: 0.3, ease }}
               className="mt-8 flex justify-center gap-4"
             >
@@ -960,8 +974,8 @@ export default function HomePage() {
             {['Next.js', 'React', 'TypeScript', 'Tailwind', 'Firebase', 'Framer Motion', 'Vercel'].map((t, i) => (
               <motion.span
                 key={t}
-                initial={{ opacity: 0, scale: 0.8 }}
-                whileInView={{ opacity: 1, scale: 1 }}
+                initial={{ scale: 0.8 }}
+                whileInView={{ scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.06, duration: 0.4, ease }}
                 className="rounded-full border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] px-4 py-2 text-xs font-medium text-black dark:text-white/50 transition-all hover:border-indigo-400/40 hover:text-indigo-500 dark:hover:text-indigo-400"
@@ -994,8 +1008,8 @@ export default function HomePage() {
       {/* ─── Final CTA ─── */}
       <Section className="py-24">
         <motion.div
-          initial={{ opacity: 0, scale: 0.96 }}
-          whileInView={{ opacity: 1, scale: 1 }}
+          initial={{ scale: 0.96 }}
+          whileInView={{ scale: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, ease }}
           className="relative overflow-hidden rounded-3xl border border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] px-8 py-16 text-center"
@@ -1050,6 +1064,7 @@ export default function HomePage() {
                 <a href="#features" className="block transition-colors hover:text-black dark:hover:text-white/70">Features</a>
                 <a href="#how-it-works" className="block transition-colors hover:text-black dark:hover:text-white/70">How It Works</a>
                 <a href="#demo" className="block transition-colors hover:text-black dark:hover:text-white/70">Demo</a>
+                <a href="#pulse-ai" className="block transition-colors hover:text-black dark:hover:text-white/70">Pulse AI</a>
               </div>
               <div className="space-y-2">
                 <p className="font-semibold text-black dark:text-white/60">Stack</p>

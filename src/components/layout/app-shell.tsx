@@ -3,6 +3,7 @@
 import { useAuth } from '@/components/providers/auth-provider';
 import { useTheme } from 'next-themes';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useEventSource } from '@/hooks/use-event-source';
@@ -43,12 +44,14 @@ function timeAgo(dateStr: string) {
 export function AppShell() {
   const { user, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
+  const router = useRouter();
   const [activeNav, setActiveNav] = useState<NavId>('dashboard');
   const [mounted, setMounted] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [cmdOpen, setCmdOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [sidebarLottiePop, setSidebarLottiePop] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const hasMounted = useRef(false);
 
@@ -205,20 +208,34 @@ export function AppShell() {
             className="fixed inset-y-0 left-0 z-50 md:relative md:z-10 flex w-[240px] flex-col border-r border-white/[0.85] dark:border-white/[0.08] bg-white/40 dark:bg-[#0c0c1d]/60 backdrop-blur-[28px] backdrop-saturate-[180%] shadow-[0_8px_32px_rgba(100,120,200,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)]"
           >
             {/* App logo */}
-            <div className="flex items-center gap-2 px-5 py-4">
-              <Image
-                src="/icons/web-app-manifest-512x512.png"
-                alt="RehanPulse"
-                width={32}
-                height={32}
-                className="rounded-lg"
-              />
+            <button
+              onClick={() => {
+                setSidebarLottiePop(true);
+                setTimeout(() => {
+                  setSidebarLottiePop(false);
+                  router.push('/home');
+                }, 2000);
+              }}
+              className="flex items-center gap-2 px-5 py-4 transition-transform hover:scale-[1.05] active:scale-[0.95]"
+            >
+              {sidebarLottiePop ? (
+                <div className="h-8 w-8" style={{ filter: 'brightness(0) saturate(100%) invert(34%) sepia(25%) saturate(1800%) hue-rotate(207deg) brightness(88%) contrast(88%)' }}>
+                  <DotLottieReact src="/animated-icons/pulse.lottie" autoplay loop style={{ width: 32, height: 32 }} />
+                </div>
+              ) : (
+                <Image
+                  src="/icons/web-app-manifest-512x512.png"
+                  alt="RehanPulse"
+                  width={32}
+                  height={32}
+                />
+              )}
               <div>
                 <span className="text-sm font-semibold text-gray-900 dark:text-white">
                   Rehan<span className="text-indigo-400">Pulse</span>
                 </span>
               </div>
-            </div>
+            </button>
 
             {/* Nav items */}
             <nav className="mt-2 flex-1 space-y-0.5 px-3" aria-label="Main navigation">

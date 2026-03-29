@@ -2162,7 +2162,7 @@ function DangerZone() {
             ) : (
               <div className="flex shrink-0 flex-col items-end gap-2">
                 <p className="text-[11px] text-red-400/80 max-w-[220px] text-right">
-                  You can sign in again with your GitHub account, but your data (notifications, rules) will be lost.
+                  You can sign in again with your GitHub account, but your data (notifications, rules, and AI chat history) will be lost.
                 </p>
                 <div className="flex gap-2">
                   <button

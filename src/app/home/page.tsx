@@ -17,7 +17,7 @@ const AnimatedBackground = dynamic(
   () => import('@/components/ui/animated-background').then((m) => m.AnimatedBackground),
   { ssr: false }
 );
-
+                                                                                
 /* ─── Animation Presets ─── */
 const ease = [0.22, 1, 0.36, 1] as const;
 const stagger = { animate: { transition: { staggerChildren: 0.08 } } };

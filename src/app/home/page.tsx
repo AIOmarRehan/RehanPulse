@@ -1,7 +1,7 @@
 'use client';
 
-// TODO: Remove this intentional error after testing alerts
-const intentionalError: number = 'this is not a number'; // Type error for testing
+// TODO: Remove after deployment alert testing
+import { nonExistentExport } from 'react';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, useInView, AnimatePresence } from 'framer-motion';

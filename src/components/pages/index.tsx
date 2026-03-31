@@ -1594,23 +1594,29 @@ export function AlertsContent() {
               const ciChildren = g.items.filter((n) => getSource(n) === 'github-ci');
               const vercelChildren = g.items.filter((n) => getSource(n) === 'vercel');
 
-              // Compute parent severity from children using mixed logic
+              // Compute parent severity from LATEST notification per source
+              // This ensures old in-progress events don't override final results
               let parentSeverity: string;
               if (children.length === 0) {
-                // Just a commit, no CI/deployment yet
                 parentSeverity = 'info';
               } else {
-                const hasError = children.some((n) => n.severity === 'error');
-                const hasSuccess = children.some((n) => n.severity === 'success');
-                const hasInProgress = children.some((n) => n.severity === 'warning');
-                if (hasInProgress) {
-                  parentSeverity = 'warning'; // still in progress → yellow
-                } else if (hasError && hasSuccess) {
-                  parentSeverity = 'warning'; // mixed results → yellow
-                } else if (hasError) {
-                  parentSeverity = 'error'; // all failed → red
-                } else if (hasSuccess) {
-                  parentSeverity = 'success'; // all passed → green
+                const latestPerSource: string[] = [];
+                for (const srcItems of [ciChildren, vercelChildren]) {
+                  if (srcItems.length === 0) continue;
+                  const latest = srcItems.reduce((a, b) =>
+                    new Date(b.createdAt).getTime() > new Date(a.createdAt).getTime() ? b : a
+                  );
+                  latestPerSource.push(latest.severity);
+                }
+                const hasError = latestPerSource.includes('error');
+                const hasSuccess = latestPerSource.includes('success');
+                const hasPending = latestPerSource.includes('warning');
+                if (hasSuccess && !hasError && !hasPending) {
+                  parentSeverity = 'success'; // all done, all green
+                } else if (hasError && !hasSuccess && !hasPending) {
+                  parentSeverity = 'error'; // all done, all red
+                } else if (hasError || hasPending) {
+                  parentSeverity = 'warning'; // mixed or still pending
                 } else {
                   parentSeverity = 'info';
                 }

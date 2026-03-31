@@ -318,7 +318,18 @@ async function evaluateAlertRules(
     if (event.eventType === 'deployment' && event.action && !['created'].includes(event.action)) {
       return;
     }
-    // deployment_status always passes through — its state (success/failure/error/pending) is the signal
+    // deployment_status: only let FINAL states through (success/failure/error)
+    // Skip intermediate states (pending, in_progress, queued, inactive) to avoid noise
+    if (event.eventType === 'deployment_status') {
+      const isFinal = event.summary.includes('Vercel: success') ||
+                      event.summary.includes('Vercel: failure') ||
+                      event.summary.includes('Vercel: error');
+      if (!isFinal) {
+        console.log(`[Alert] Skipping non-final deployment_status: ${event.summary.slice(0, 80)}`);
+        return;
+      }
+      console.log(`[Alert] Final deployment_status received: ${event.summary.slice(0, 80)}`);
+    }
     // PR: skip non-meaningful actions (synchronize, labeled, etc.)
     if (event.eventType === 'pull_request') {
       if (event.type === 'pr_updated') return; // only opened/closed matter
@@ -373,10 +384,8 @@ async function evaluateAlertRules(
           severity = 'error';
         } else if (event.summary.includes('success') || event.summary.includes('active')) {
           severity = 'success';
-        } else if (event.summary.includes('pending') || event.summary.includes('in_progress') || event.summary.includes('queued')) {
-          severity = 'warning';
         } else {
-          severity = 'info';
+          severity = 'warning'; // deployment created or pending → treat as in-progress
         }
       } else if (event.type === 'push') {
         severity = 'info';

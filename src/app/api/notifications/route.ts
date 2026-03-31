@@ -12,18 +12,19 @@ export async function GET(request: NextRequest) {
     const user = await getAdminAuth().verifySessionCookie(session, true);
     const db = getAdminDb();
 
-    // orderBy + limit ensures we always get the 100 most recent notifications
-    // NOTE: requires a composite Firestore index on (uid ASC, createdAt DESC).
-    // Firestore will log an error with a link to create it on first run.
     const snap = await db
       .collection('notifications')
       .where('uid', '==', user.uid)
-      .orderBy('createdAt', 'desc')
       .limit(100)
       .get();
 
     const notifications = snap.docs
-      .map((doc) => ({ id: doc.id, ...doc.data() }));
+      .map((doc) => ({ id: doc.id, ...doc.data() }))
+      .sort((a, b) => {
+        const aTime = typeof (a as Record<string, unknown>).createdAt === 'string' ? new Date((a as Record<string, unknown>).createdAt as string).getTime() : 0;
+        const bTime = typeof (b as Record<string, unknown>).createdAt === 'string' ? new Date((b as Record<string, unknown>).createdAt as string).getTime() : 0;
+        return bTime - aTime;
+      });
 
     return NextResponse.json({ notifications });
   } catch (error) {

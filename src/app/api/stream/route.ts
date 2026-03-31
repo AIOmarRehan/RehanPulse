@@ -36,11 +36,9 @@ export async function GET(request: NextRequest) {
       }, 30_000);
 
       // Listen for new webhook events filtered to this user
-      // orderBy ensures we get the most recent events reliably
       const unsubWebhooks = db
         .collection('webhook_events')
         .where('uid', '==', uid)
-        .orderBy('createdAt', 'desc')
         .limit(50)
         .onSnapshot(
           (snapshot) => {
@@ -80,7 +78,6 @@ export async function GET(request: NextRequest) {
       const unsubNotifs = db
         .collection('notifications')
         .where('uid', '==', uid)
-        .orderBy('createdAt', 'desc')
         .limit(20)
         .onSnapshot(
           (snapshot) => {

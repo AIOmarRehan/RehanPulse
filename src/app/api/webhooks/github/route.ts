@@ -357,23 +357,27 @@ async function evaluateAlertRules(
     }
 
     // Find enabled rules for THIS user that match the event type
+    // Use single-field query to avoid composite index requirement, filter in JS
     const rulesSnap = await db
       .collection('alert_rules')
       .where('uid', '==', uid)
-      .where('enabled', '==', true)
-      .where('eventType', '==', event.type)
       .get();
 
-    if (rulesSnap.empty) {
+    const matchingRules = rulesSnap.docs.filter((doc) => {
+      const d = doc.data() as { enabled?: boolean; eventType?: string };
+      return d.enabled === true && d.eventType === event.type;
+    });
+
+    if (matchingRules.length === 0) {
       console.log(`[Alert] No enabled rules found for eventType=${event.type}`);
       return;
     }
 
-    console.log(`[Alert] Found ${rulesSnap.size} matching rule(s) for eventType=${event.type}`);
+    console.log(`[Alert] Found ${matchingRules.length} matching rule(s) for eventType=${event.type}`);
 
     const batch = db.batch();
 
-    for (const ruleDoc of rulesSnap.docs) {
+    for (const ruleDoc of matchingRules) {
       const rule = ruleDoc.data() as { uid: string; name: string; eventType: string };
 
       // Determine severity based on event type and content

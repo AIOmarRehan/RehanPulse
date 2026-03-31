@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
       const unsubNotifs = db
         .collection('notifications')
         .where('uid', '==', uid)
-        .limit(20)
+        .limit(50)
         .onSnapshot(
           (snapshot) => {
             for (const change of snapshot.docChanges()) {

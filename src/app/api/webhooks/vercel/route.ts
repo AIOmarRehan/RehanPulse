@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createHmac, timingSafeEqual } from 'crypto';
+import { createHmac, createHash, timingSafeEqual } from 'crypto';
 import { getAdminDb } from '@/lib/firebase-admin';
 
 /** Verify Vercel webhook x-vercel-signature HMAC SHA1. */
@@ -11,6 +11,11 @@ function verifySignature(payload: string, signature: string | null, secret: stri
   } catch {
     return false;
   }
+}
+
+/** Deterministic notification doc ID — enables UPSERT (same group+source overwrites). */
+function notificationDocId(uid: string, groupKey: string, source: string): string {
+  return createHash('sha256').update(`${uid}:${groupKey}:${source}`).digest('hex').slice(0, 24);
 }
 
 /** Map Vercel event type to severity. */
@@ -142,9 +147,8 @@ export async function POST(request: NextRequest) {
       uid,
     });
 
-    // Create notification if user has a 'deployment' alert rule enabled
-    // Only filter by uid in Firestore to avoid needing composite indexes,
-    // then filter enabled + eventType in JavaScript
+    // Always create a notification — user opted in by registering Vercel webhook.
+    // Use rule name if available, otherwise default label.
     const rulesSnap = await db
       .collection('alert_rules')
       .where('uid', '==', uid)
@@ -155,27 +159,32 @@ export async function POST(request: NextRequest) {
       return d.enabled === true && d.eventType === 'deployment';
     });
 
-    if (matchingRules.length > 0) {
-      const batch = db.batch();
-      for (const ruleDoc of matchingRules) {
-        const rule = ruleDoc.data() as { name: string };
-        const notifRef = db.collection('notifications').doc();
-        batch.set(notifRef, {
-          uid,
-          severity,
-          source: 'vercel' as const,
-          message: `[${rule.name}] ${summary}`,
-          eventType: 'deployment',
-          read: false,
-          createdAt: new Date().toISOString(),
-          ...(groupKey ? { groupKey } : {}),
-          ...(groupTitle ? { groupTitle } : {}),
-          ...(repoFullName ? { repo: repoFullName } : {}),
-        });
-      }
-      await batch.commit();
-      console.log(`[Vercel Webhook] Created ${matchingRules.length} notification(s)`);
+    const ruleName = matchingRules.length > 0
+      ? (matchingRules[0]!.data() as { name: string }).name
+      : 'Vercel Deployment';
+
+    const notifData = {
+      uid,
+      severity,
+      source: 'vercel' as const,
+      message: `[${ruleName}] ${summary}`,
+      eventType: 'deployment',
+      read: false,
+      createdAt: new Date().toISOString(),
+      ...(groupKey ? { groupKey } : {}),
+      ...(groupTitle ? { groupTitle } : {}),
+      ...(repoFullName ? { repo: repoFullName } : {}),
+    };
+
+    // UPSERT: deterministic doc ID — deployment.created → .ready/.error
+    // updates the SAME notification instead of creating duplicates
+    if (groupKey) {
+      const docId = notificationDocId(uid, groupKey, 'vercel');
+      await db.collection('notifications').doc(docId).set(notifData);
+    } else {
+      await db.collection('notifications').add(notifData);
     }
+    console.log(`[Vercel Webhook] Upserted notification for ${eventType}`);
 
     return NextResponse.json({ received: true, event: eventType });
   } catch (error) {

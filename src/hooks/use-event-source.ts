@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useEventStore, type WebhookEvent } from '@/lib/stores/event-store';
 
 const MAX_RETRIES = 10;
@@ -15,9 +16,11 @@ export function useEventSource() {
   const addEvent = useEventStore((s) => s.addEvent);
   const setConnected = useEventStore((s) => s.setConnected);
   const setConnectionStatus = useEventStore((s) => s.setConnectionStatus);
+  const queryClient = useQueryClient();
   const retriesRef = useRef(0);
   const esRef = useRef<EventSource | null>(null);
   const mountedRef = useRef(true);
+  const initialLoadRef = useRef(true);
 
   const connect = useCallback(() => {
     if (!mountedRef.current) return;
@@ -29,12 +32,20 @@ export function useEventSource() {
     es.onopen = () => {
       retriesRef.current = 0;
       setConnected(true);
+      // Skip notification refetch for the initial snapshot burst
+      initialLoadRef.current = true;
+      setTimeout(() => { initialLoadRef.current = false; }, 2000);
     };
 
     es.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data as string) as WebhookEvent;
         addEvent(data);
+        // When a new webhook event arrives (not initial load), refetch notifications
+        // because evaluateAlertRules likely created a matching notification
+        if (!initialLoadRef.current) {
+          queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        }
       } catch {
         // Ignore malformed messages
       }
@@ -52,7 +63,7 @@ export function useEventSource() {
         setTimeout(connect, delay);
       }
     };
-  }, [addEvent, setConnected, setConnectionStatus]);
+  }, [addEvent, setConnected, setConnectionStatus, queryClient]);
 
   useEffect(() => {
     mountedRef.current = true;

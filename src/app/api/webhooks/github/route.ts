@@ -198,6 +198,25 @@ function buildSummary(eventType: string, action: string | undefined, payload: un
       const conclusion = cr?.conclusion as string | undefined;
       return `CI: ${name ?? 'check'} — ${conclusion ?? action ?? 'running'}`;
     }
+    case 'star': {
+      const sender = (p.sender as Record<string, unknown> | undefined)?.login as string | undefined;
+      const repo = (p.repository as Record<string, unknown> | undefined)?.full_name as string | undefined;
+      return action === 'created'
+        ? `${sender ?? 'Someone'} starred ${repo ?? 'a repository'}`
+        : `${sender ?? 'Someone'} unstarred ${repo ?? 'a repository'}`;
+    }
+    case 'issues': {
+      const issue = p.issue as Record<string, unknown> | undefined;
+      const title = issue?.title as string | undefined;
+      const num = issue?.number as number | undefined;
+      return `Issue ${action ?? 'updated'}: #${num ?? '?'} ${title ?? 'Unknown'}`;
+    }
+    case 'deployment': {
+      const dep = p.deployment as Record<string, unknown> | undefined;
+      const ref = dep?.ref as string | undefined;
+      const env = dep?.environment as string | undefined;
+      return `Deployment ${action ?? 'created'}${ref ? ` on ${ref}` : ''}${env ? ` (${env})` : ''}`;
+    }
     case 'workflow_run': {
       const wr = p.workflow_run as Record<string, unknown> | undefined;
       const name = wr?.name as string | undefined;
@@ -242,7 +261,9 @@ async function evaluateAlertRules(
         event.type === 'ci' ? ciSeverity :
         event.type === 'push' ? 'info' :
         event.type === 'pr_opened' ? 'info' :
-        event.type === 'pr_closed' ? 'success' : 'info';
+        event.type === 'pr_closed' ? 'success' :
+        event.type === 'star' ? 'success' :
+        event.type === 'issue' ? 'warning' : 'info';
 
       const notifRef = db.collection('notifications').doc();
       batch.set(notifRef, {

@@ -176,15 +176,17 @@ export async function POST(request: NextRequest) {
       ...(repoFullName ? { repo: repoFullName } : {}),
     };
 
-    // UPSERT: deterministic doc ID — deployment.created → .ready/.error
-    // updates the SAME notification instead of creating duplicates
+    // UPSERT: deterministic doc ID with lifecycle phase
+    // deployment.created (progress) and deployment.ready (final) are SEPARATE notifications
+    // but duplicates of the SAME phase are still deduplicated
+    const phase = eventType === 'deployment.created' ? 'progress' : 'final';
     if (groupKey) {
-      const docId = notificationDocId(uid, groupKey, 'vercel');
+      const docId = notificationDocId(uid, groupKey, `vercel:${phase}`);
       await db.collection('notifications').doc(docId).set(notifData);
     } else {
       await db.collection('notifications').add(notifData);
     }
-    console.log(`[Vercel Webhook] Upserted notification for ${eventType}`);
+    console.log(`[Vercel Webhook] Upserted notification for ${eventType} (phase=${phase})`);
 
     return NextResponse.json({ received: true, event: eventType });
   } catch (error) {

@@ -424,10 +424,12 @@ async function evaluateAlertRules(
         ...(event.repo ? { repo: event.repo } : {}),
       };
 
-      // UPSERT: deterministic doc ID when groupKey exists
-      // CI in_progress → completed updates the SAME notification (no duplicates)
+      // UPSERT: deterministic doc ID with lifecycle phase
+      // CI in_progress and CI completed each get their OWN persistent notification
+      // but duplicates of the SAME phase are still deduplicated
       if (event.groupKey) {
-        const docId = notificationDocId(rule.uid, event.groupKey, source);
+        const phase = (event.type === 'ci' && event.action === 'in_progress') ? 'progress' : 'final';
+        const docId = notificationDocId(rule.uid, event.groupKey, `${source}:${phase}`);
         batch.set(db.collection('notifications').doc(docId), notifData);
       } else {
         batch.set(db.collection('notifications').doc(), notifData);

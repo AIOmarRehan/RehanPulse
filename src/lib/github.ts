@@ -307,14 +307,22 @@ export async function registerWebhooksForUser(
   const octokit = new Octokit({ auth: githubAccessToken });
   const stats = { registered: 0, skipped: 0, errors: 0, errorDetails: [] as string[] };
 
-  let repos: Array<{ full_name: string }>;
+  let repos: Array<{ full_name: string }> = [];
   try {
-    const { data } = await octokit.rest.repos.listForAuthenticatedUser({
-      sort: 'pushed',
-      per_page: 30,
-      type: 'owner',
-    });
-    repos = data.map((r) => ({ full_name: r.full_name }));
+    // Paginate to cover ALL user repos (not just 30)
+    let page = 1;
+    let hasMore = true;
+    while (hasMore) {
+      const { data } = await octokit.rest.repos.listForAuthenticatedUser({
+        sort: 'pushed',
+        per_page: 100,
+        page,
+        type: 'owner',
+      });
+      repos.push(...data.map((r) => ({ full_name: r.full_name })));
+      hasMore = data.length === 100;
+      page++;
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     console.error('Failed to list repos for webhook registration:', msg);

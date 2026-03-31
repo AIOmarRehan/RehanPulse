@@ -23,6 +23,7 @@ export interface Notification {
   groupKey?: string;
   groupTitle?: string;
   repo?: string;
+  source?: 'commit' | 'github-ci' | 'vercel';
 }
 
 async function fetchAlerts(): Promise<{ rules: AlertRule[] }> {

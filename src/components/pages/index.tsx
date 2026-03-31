@@ -1579,11 +1579,48 @@ export function AlertsContent() {
               // Grouped notification
               const g = entry as { key: string; title: string; items: Notification[] };
               const isExpanded = expandedGroups.has(g.key);
-              const worstSeverity = g.items.some((x) => x.severity === 'error') ? 'error'
-                : g.items.some((x) => x.severity === 'warning') ? 'warning'
-                : g.items.some((x) => x.severity === 'success') ? 'success' : 'info';
-              const parentStyle = severityStyle[worstSeverity] ?? severityStyle.info!;
+
+              // Infer source for older notifications without the field
+              const getSource = (n: Notification): string => {
+                if (n.source) return n.source;
+                if (n.eventType === 'ci') return 'github-ci';
+                if (n.eventType === 'deployment') return 'vercel';
+                if (n.eventType === 'push') return 'commit';
+                return 'commit';
+              };
+
+              // Separate commit (parent info) from children (CI/deployment)
+              const children = g.items.filter((n) => getSource(n) !== 'commit');
+              const ciChildren = g.items.filter((n) => getSource(n) === 'github-ci');
+              const vercelChildren = g.items.filter((n) => getSource(n) === 'vercel');
+
+              // Compute parent severity from children using mixed logic
+              let parentSeverity: string;
+              if (children.length === 0) {
+                // Just a commit, no CI/deployment yet
+                parentSeverity = 'info';
+              } else {
+                const hasError = children.some((n) => n.severity === 'error');
+                const hasSuccess = children.some((n) => n.severity === 'success');
+                const hasInProgress = children.some((n) => n.severity === 'warning');
+                if (hasInProgress) {
+                  parentSeverity = 'warning'; // still in progress → yellow
+                } else if (hasError && hasSuccess) {
+                  parentSeverity = 'warning'; // mixed results → yellow
+                } else if (hasError) {
+                  parentSeverity = 'error'; // all failed → red
+                } else if (hasSuccess) {
+                  parentSeverity = 'success'; // all passed → green
+                } else {
+                  parentSeverity = 'info';
+                }
+              }
+
+              const parentStyle = severityStyle[parentSeverity] ?? severityStyle.info!;
               const allRead = g.items.every((x) => x.read);
+
+              // Source section header labels
+              const sourceLabel: Record<string, string> = { 'github-ci': 'GitHub CI', vercel: 'Vercel', commit: 'Commit' };
 
               return (
                 <motion.div
@@ -1602,6 +1639,18 @@ export function AlertsContent() {
                       <p className="text-sm font-medium text-gray-900 dark:text-white">{g.title}</p>
                       <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-400 dark:text-white/30">
                         <span>{g.items.length} event{g.items.length > 1 ? 's' : ''}</span>
+                        {ciChildren.length > 0 && (
+                          <>
+                            <span>&middot;</span>
+                            <span>GitHub CI: {ciChildren.length}</span>
+                          </>
+                        )}
+                        {vercelChildren.length > 0 && (
+                          <>
+                            <span>&middot;</span>
+                            <span>Vercel: {vercelChildren.length}</span>
+                          </>
+                        )}
                         <span>&middot;</span>
                         <span>{timeAgo(g.items[0]!.createdAt)}</span>
                       </div>
@@ -1619,7 +1668,7 @@ export function AlertsContent() {
                     </svg>
                   </button>
 
-                  {/* Children with connecting pipe */}
+                  {/* Children organized by source */}
                   <AnimatePresence>
                     {isExpanded && (
                       <motion.div
@@ -1630,40 +1679,58 @@ export function AlertsContent() {
                         className="overflow-hidden"
                       >
                         <div className="relative ml-6 border-l-2 border-gray-200 dark:border-white/10 pb-1">
-                          {g.items.map((n) => {
-                            const childStyle = severityStyle[n.severity] ?? severityStyle.info!;
+                          {/* Group items by source, show section headers */}
+                          {(['commit', 'github-ci', 'vercel'] as const).map((src) => {
+                            const sectionItems = g.items.filter((n) => getSource(n) === src);
+                            if (sectionItems.length === 0) return null;
                             return (
-                              <div
-                                key={n.id}
-                                className={`relative flex items-start gap-3 py-3 pl-5 pr-4 transition-colors hover:bg-white/30 dark:hover:bg-white/[0.04] ${n.read ? 'opacity-50' : ''}`}
-                              >
-                                {/* Horizontal connector from pipe */}
-                                <div className="absolute left-0 top-[18px] h-px w-4 bg-gray-200 dark:bg-white/10" />
-                                <div className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${childStyle.dot}`} />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm text-gray-700 dark:text-white/80">{n.message}</p>
-                                  <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-400 dark:text-white/30">
-                                    <span className="capitalize">{n.severity}</span>
-                                    <span>&middot;</span>
-                                    <span>{n.eventType}</span>
-                                    <span>&middot;</span>
-                                    <span>{timeAgo(n.createdAt)}</span>
-                                    {n.read && (
-                                      <>
-                                        <span>&middot;</span>
-                                        <span className="text-emerald-500 dark:text-emerald-400/70">Read</span>
-                                      </>
-                                    )}
+                              <div key={src}>
+                                {/* Source section header (only if there are multiple source types) */}
+                                {(ciChildren.length > 0 || vercelChildren.length > 0) && (
+                                  <div className="relative py-1.5 pl-5 pr-4">
+                                    <div className="absolute left-0 top-[12px] h-px w-4 bg-gray-200 dark:bg-white/10" />
+                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-white/25">
+                                      {sourceLabel[src] ?? src}
+                                    </span>
                                   </div>
-                                </div>
-                                {!n.read && (
-                                  <button
-                                    onClick={() => markRead.mutate(n.id)}
-                                    className="shrink-0 rounded-lg px-2 py-1 text-[10px] text-gray-400 hover:bg-white/40 dark:hover:bg-white/[0.08] transition-colors"
-                                  >
-                                    Dismiss
-                                  </button>
                                 )}
+                                {sectionItems.map((n) => {
+                                  const childStyle = severityStyle[n.severity] ?? severityStyle.info!;
+                                  return (
+                                    <div
+                                      key={n.id}
+                                      className={`relative flex items-start gap-3 py-3 pl-5 pr-4 transition-colors hover:bg-white/30 dark:hover:bg-white/[0.04] ${n.read ? 'opacity-50' : ''}`}
+                                    >
+                                      {/* Horizontal connector from pipe */}
+                                      <div className="absolute left-0 top-[18px] h-px w-4 bg-gray-200 dark:bg-white/10" />
+                                      <div className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${childStyle.dot}`} />
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm text-gray-700 dark:text-white/80">{n.message}</p>
+                                        <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-400 dark:text-white/30">
+                                          <span className="capitalize">{n.severity}</span>
+                                          <span>&middot;</span>
+                                          <span>{n.eventType}</span>
+                                          <span>&middot;</span>
+                                          <span>{timeAgo(n.createdAt)}</span>
+                                          {n.read && (
+                                            <>
+                                              <span>&middot;</span>
+                                              <span className="text-emerald-500 dark:text-emerald-400/70">Read</span>
+                                            </>
+                                          )}
+                                        </div>
+                                      </div>
+                                      {!n.read && (
+                                        <button
+                                          onClick={() => markRead.mutate(n.id)}
+                                          className="shrink-0 rounded-lg px-2 py-1 text-[10px] text-gray-400 hover:bg-white/40 dark:hover:bg-white/[0.08] transition-colors"
+                                        >
+                                          Dismiss
+                                        </button>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             );
                           })}

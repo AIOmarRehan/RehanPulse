@@ -5,7 +5,9 @@ import {
   fetchUserRepos,
   fetchRecentCommits,
   fetchOpenPRs,
+  registerWebhooksForUser,
 } from '@/lib/github';
+import { decrypt } from '@/lib/crypto';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -48,6 +50,18 @@ export async function GET(request: NextRequest) {
         fetchRecentCommits(octokit, repos),
         fetchOpenPRs(octokit, repos),
       ]);
+
+      // Re-register webhooks on all repos (covers newly created repos)
+      if (data.githubTokenEncrypted) {
+        const ghToken = decrypt(data.githubTokenEncrypted as string);
+        const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://rehanpulse.vercel.app'}/api/webhooks/github`;
+        const webhookSecret = process.env.GITHUB_WEBHOOK_SECRET ?? '';
+        if (webhookSecret) {
+          registerWebhooksForUser(ghToken, webhookUrl, webhookSecret).catch((err) =>
+            console.error(`Cron webhook re-registration failed for ${uid}:`, err),
+          );
+        }
+      }
 
       results.push({ uid, status: 'synced' });
     } catch (err) {

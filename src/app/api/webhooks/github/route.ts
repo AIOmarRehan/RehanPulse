@@ -225,7 +225,13 @@ function buildSummary(eventType: string, action: string | undefined, payload: un
       const desc = ds?.description as string | undefined;
       const dep = p.deployment as Record<string, unknown> | undefined;
       const env = dep?.environment as string | undefined;
-      return `Deployment ${state ?? 'updated'}${env ? ` (${env})` : ''} in ${repoName}${desc ? ` — ${desc}` : ''}`;
+      const creator = (ds?.creator as Record<string, unknown> | undefined)?.login as string | undefined;
+      const parts = [`Vercel: ${state ?? 'updated'}`];
+      if (env) parts.push(`(${env})`);
+      parts.push(`in ${repoName}`);
+      if (desc) parts.push(`— ${desc}`);
+      if (creator) parts.push(`by ${creator}`);
+      return parts.join(' ');
     }
     case 'check_run': {
       const cr = p.check_run as Record<string, unknown> | undefined;
@@ -233,7 +239,14 @@ function buildSummary(eventType: string, action: string | undefined, payload: un
       const conclusion = cr?.conclusion as string | undefined;
       const status = cr?.status as string | undefined;
       const label = conclusion ?? (status === 'in_progress' ? 'in progress' : (action ?? 'running'));
-      return `CI: ${name ?? 'check'} — ${label} in ${repoName}`;
+      const startedAt = cr?.started_at as string | undefined;
+      const completedAt = cr?.completed_at as string | undefined;
+      let duration = '';
+      if (startedAt && completedAt) {
+        const secs = Math.round((new Date(completedAt).getTime() - new Date(startedAt).getTime()) / 1000);
+        duration = secs >= 60 ? ` (${Math.floor(secs / 60)}m ${secs % 60}s)` : ` (${secs}s)`;
+      }
+      return `GitHub CI: ${name ?? 'check'} — ${label}${duration} in ${repoName}`;
     }
     case 'star': {
       const sender = (p.sender as Record<string, unknown> | undefined)?.login as string | undefined;
@@ -252,18 +265,26 @@ function buildSummary(eventType: string, action: string | undefined, payload: un
       const dep = p.deployment as Record<string, unknown> | undefined;
       const ref = dep?.ref as string | undefined;
       const env = dep?.environment as string | undefined;
-      return `Deployment ${action ?? 'created'} in ${repoName}${ref ? ` on ${ref}` : ''}${env ? ` (${env})` : ''}`;
+      return `Vercel: deployment ${action ?? 'created'} in ${repoName}${ref ? ` on ${ref}` : ''}${env ? ` (${env})` : ''}`;
     }
     case 'workflow_run': {
       const wr = p.workflow_run as Record<string, unknown> | undefined;
       const name = wr?.name as string | undefined;
       const conclusion = wr?.conclusion as string | undefined;
       const status = wr?.status as string | undefined;
+      const branch = wr?.head_branch as string | undefined;
+      const runStarted = wr?.run_started_at as string | undefined;
+      const updatedAt = wr?.updated_at as string | undefined;
+      let duration = '';
+      if (runStarted && updatedAt && conclusion) {
+        const secs = Math.round((new Date(updatedAt).getTime() - new Date(runStarted).getTime()) / 1000);
+        duration = secs >= 60 ? ` (${Math.floor(secs / 60)}m ${secs % 60}s)` : ` (${secs}s)`;
+      }
       if (action === 'completed' && conclusion) {
-        return `CI: ${name ?? 'workflow'} — ${conclusion} in ${repoName}`;
+        return `GitHub CI: ${name ?? 'workflow'} — ${conclusion}${duration} in ${repoName}${branch ? `/${branch}` : ''}`;
       }
       const label = status === 'in_progress' ? 'in progress' : (action ?? 'running');
-      return `CI: ${name ?? 'workflow'} — ${label} in ${repoName}`;
+      return `GitHub CI: ${name ?? 'workflow'} — ${label} in ${repoName}${branch ? `/${branch}` : ''}`;
     }
     default:
       return `${eventType}${action ? `: ${action}` : ''}${repoName ? ` in ${repoName}` : ''}`;
@@ -301,6 +322,14 @@ async function evaluateAlertRules(
     // PR: skip non-meaningful actions (synchronize, labeled, etc.)
     if (event.eventType === 'pull_request') {
       if (event.type === 'pr_updated') return; // only opened/closed matter
+    }
+
+    // Determine notification source for nesting
+    let source: 'commit' | 'github-ci' | 'vercel' = 'commit';
+    if (event.type === 'ci') {
+      source = 'github-ci';
+    } else if (event.type === 'deployment') {
+      source = 'vercel';
     }
 
     // Find all enabled rules that match this event type
@@ -367,6 +396,7 @@ async function evaluateAlertRules(
       batch.set(notifRef, {
         uid: rule.uid,
         severity,
+        source,
         message: `[${rule.name}] ${event.summary}`,
         eventType: event.type,
         read: false,

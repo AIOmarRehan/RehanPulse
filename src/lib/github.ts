@@ -307,7 +307,7 @@ export async function registerWebhooksForUser(
   const octokit = new Octokit({ auth: githubAccessToken });
   const stats = { registered: 0, skipped: 0, errors: 0, errorDetails: [] as string[] };
 
-  let repos: Array<{ full_name: string }> = [];
+  const repos: Array<{ full_name: string }> = [];
   try {
     // Paginate to cover ALL user repos (not just 30)
     let page = 1;

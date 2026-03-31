@@ -322,17 +322,33 @@ export async function registerWebhooksForUser(
     return stats;
   }
 
+  const WEBHOOK_EVENTS = ['push', 'pull_request', 'check_run', 'deployment', 'deployment_status', 'workflow_run', 'issues', 'star'];
+
   for (const repo of repos) {
     const [owner, repoName] = repo.full_name.split('/') as [string, string];
     try {
-      // Check existing hooks — skip if one already points to our URL
+      // Check existing hooks
       const { data: hooks } = await octokit.rest.repos.listWebhooks({
         owner,
         repo: repoName,
       });
-      const existing = hooks.some((h) => h.config.url === webhookUrl);
-      if (existing) {
-        stats.skipped++;
+      const existingHook = hooks.find((h) => h.config.url === webhookUrl);
+      if (existingHook) {
+        // Update the existing webhook to ensure all events are registered
+        const currentEvents = new Set(existingHook.events ?? []);
+        const needsUpdate = WEBHOOK_EVENTS.some((e) => !currentEvents.has(e)) || !existingHook.active;
+        if (needsUpdate) {
+          await octokit.rest.repos.updateWebhook({
+            owner,
+            repo: repoName,
+            hook_id: existingHook.id,
+            events: WEBHOOK_EVENTS,
+            active: true,
+          });
+          stats.registered++;
+        } else {
+          stats.skipped++;
+        }
         continue;
       }
 
@@ -345,7 +361,7 @@ export async function registerWebhooksForUser(
           content_type: 'json',
           secret: webhookSecret,
         },
-        events: ['push', 'pull_request', 'check_run', 'deployment', 'workflow_run', 'issues', 'star'],
+        events: WEBHOOK_EVENTS,
         active: true,
       });
       stats.registered++;

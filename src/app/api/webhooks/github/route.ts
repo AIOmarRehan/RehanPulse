@@ -175,68 +175,105 @@ function extractGroupTitle(eventType: string, repo: string, payload: unknown): s
 /** Build a human-readable summary of the event. */
 function buildSummary(eventType: string, action: string | undefined, payload: unknown): string {
   const p = payload as Record<string, unknown>;
+  const repoName = ((p.repository as Record<string, unknown> | undefined)?.full_name as string | undefined)?.split('/')[1] ?? '';
 
   switch (eventType) {
     case 'push': {
-      const commits = Array.isArray(p.commits) ? p.commits.length : 0;
+      const commits = Array.isArray(p.commits) ? p.commits as Array<Record<string, unknown>> : [];
       const ref = typeof p.ref === 'string' ? p.ref.replace('refs/heads/', '') : 'unknown';
-      return `Pushed ${commits} commit(s) to ${ref}`;
+      const headCommit = p.head_commit as Record<string, unknown> | undefined;
+      const msg = (headCommit?.message as string | undefined)?.split('\n')[0] ?? '';
+      const author = (headCommit?.author as Record<string, unknown> | undefined)?.username as string | undefined
+        ?? (headCommit?.author as Record<string, unknown> | undefined)?.name as string | undefined
+        ?? '';
+      const commitInfo = msg ? `: "${msg}"` : '';
+      const authorInfo = author ? ` by ${author}` : '';
+      return `Pushed ${commits.length} commit(s) to ${repoName}/${ref}${commitInfo}${authorInfo}`;
     }
     case 'pull_request': {
       const pr = p.pull_request as Record<string, unknown> | undefined;
       const title = pr?.title as string | undefined;
-      return `PR ${action ?? 'updated'}: ${title ?? 'Unknown'}`;
+      const num = pr?.number as number | undefined;
+      const merged = pr?.merged as boolean | undefined;
+      const prAction = action === 'closed' && merged ? 'merged' : (action ?? 'updated');
+      return `PR #${num ?? '?'} ${prAction} in ${repoName}: ${title ?? 'Unknown'}`;
     }
     case 'deployment_status': {
       const ds = p.deployment_status as Record<string, unknown> | undefined;
       const state = ds?.state as string | undefined;
-      return `Deployment ${state ?? 'updated'}`;
+      const desc = ds?.description as string | undefined;
+      const dep = p.deployment as Record<string, unknown> | undefined;
+      const env = dep?.environment as string | undefined;
+      return `Deployment ${state ?? 'updated'}${env ? ` (${env})` : ''} in ${repoName}${desc ? ` — ${desc}` : ''}`;
     }
     case 'check_run': {
       const cr = p.check_run as Record<string, unknown> | undefined;
       const name = cr?.name as string | undefined;
       const conclusion = cr?.conclusion as string | undefined;
-      return `CI: ${name ?? 'check'} — ${conclusion ?? action ?? 'running'}`;
+      return `CI: ${name ?? 'check'} — ${conclusion ?? action ?? 'running'} in ${repoName}`;
     }
     case 'star': {
       const sender = (p.sender as Record<string, unknown> | undefined)?.login as string | undefined;
-      const repo = (p.repository as Record<string, unknown> | undefined)?.full_name as string | undefined;
+      const fullRepo = (p.repository as Record<string, unknown> | undefined)?.full_name as string | undefined;
       return action === 'created'
-        ? `${sender ?? 'Someone'} starred ${repo ?? 'a repository'}`
-        : `${sender ?? 'Someone'} unstarred ${repo ?? 'a repository'}`;
+        ? `${sender ?? 'Someone'} starred ${fullRepo ?? repoName}`
+        : `${sender ?? 'Someone'} unstarred ${fullRepo ?? repoName}`;
     }
     case 'issues': {
       const issue = p.issue as Record<string, unknown> | undefined;
       const title = issue?.title as string | undefined;
       const num = issue?.number as number | undefined;
-      return `Issue ${action ?? 'updated'}: #${num ?? '?'} ${title ?? 'Unknown'}`;
+      return `Issue #${num ?? '?'} ${action ?? 'updated'} in ${repoName}: ${title ?? 'Unknown'}`;
     }
     case 'deployment': {
       const dep = p.deployment as Record<string, unknown> | undefined;
       const ref = dep?.ref as string | undefined;
       const env = dep?.environment as string | undefined;
-      return `Deployment ${action ?? 'created'}${ref ? ` on ${ref}` : ''}${env ? ` (${env})` : ''}`;
+      return `Deployment ${action ?? 'created'} in ${repoName}${ref ? ` on ${ref}` : ''}${env ? ` (${env})` : ''}`;
     }
     case 'workflow_run': {
       const wr = p.workflow_run as Record<string, unknown> | undefined;
       const name = wr?.name as string | undefined;
       const conclusion = wr?.conclusion as string | undefined;
       if (action === 'completed' && conclusion) {
-        return `CI: ${name ?? 'workflow'} — ${conclusion}`;
+        return `CI: ${name ?? 'workflow'} — ${conclusion} in ${repoName}`;
       }
-      return `CI: ${name ?? 'workflow'} — ${action ?? 'running'}`;
+      return `CI: ${name ?? 'workflow'} — ${action ?? 'running'} in ${repoName}`;
     }
     default:
-      return `${eventType}${action ? `: ${action}` : ''}`;
+      return `${eventType}${action ? `: ${action}` : ''}${repoName ? ` in ${repoName}` : ''}`;
   }
 }
 
 /** Evaluate alert rules against a new event and create notifications for matching rules. */
 async function evaluateAlertRules(
   db: Firestore,
-  event: { type: string; summary: string; createdAt: string; repo: string | null; groupKey: string | null; groupTitle: string | null },
+  event: {
+    eventType: string;
+    action: string | null;
+    type: string;
+    summary: string;
+    createdAt: string;
+    repo: string | null;
+    groupKey: string | null;
+    groupTitle: string | null;
+  },
 ) {
   try {
+    // ── Skip noisy intermediate events that aren't actionable ──
+    // CI: only notify on 'completed' (skip 'created', 'in_progress', 'requested', 'rerequested')
+    if (event.type === 'ci') {
+      if (event.action !== 'completed') return;
+    }
+    // Deployment: only notify on actual status changes, not every action
+    if (event.eventType === 'deployment' && event.action && !['created'].includes(event.action)) {
+      return;
+    }
+    // PR: skip non-meaningful actions (synchronize, labeled, etc.)
+    if (event.eventType === 'pull_request') {
+      if (event.type === 'pr_updated') return; // only opened/closed matter
+    }
+
     // Find all enabled rules that match this event type
     const rulesSnap = await db
       .collection('alert_rules')
@@ -251,19 +288,44 @@ async function evaluateAlertRules(
     for (const ruleDoc of rulesSnap.docs) {
       const rule = ruleDoc.data() as { uid: string; name: string; eventType: string };
 
-      // Determine severity based on event type
-      const ciSeverity = event.summary.includes('— failure') || event.summary.includes('— timed_out') || event.summary.includes('— cancelled')
-        ? 'error'
-        : event.summary.includes('— success')
-          ? 'success'
-          : 'info';
-      const severity = event.type === 'deployment' ? 'warning' :
-        event.type === 'ci' ? ciSeverity :
-        event.type === 'push' ? 'info' :
-        event.type === 'pr_opened' ? 'info' :
-        event.type === 'pr_closed' ? 'success' :
-        event.type === 'star' ? 'success' :
-        event.type === 'issue' ? 'warning' : 'info';
+      // Determine severity based on event type and content
+      let severity: 'error' | 'warning' | 'info' | 'success' = 'info';
+
+      if (event.type === 'ci') {
+        // CI: severity from conclusion
+        if (event.summary.includes('— failure') || event.summary.includes('— timed_out') || event.summary.includes('— cancelled') || event.summary.includes('— startup_failure')) {
+          severity = 'error';
+        } else if (event.summary.includes('— success')) {
+          severity = 'success';
+        } else if (event.summary.includes('— skipped') || event.summary.includes('— neutral')) {
+          severity = 'info';
+        } else {
+          severity = 'warning';
+        }
+      } else if (event.type === 'deployment') {
+        // Deployment status: severity from state
+        if (event.summary.includes('failure') || event.summary.includes('error')) {
+          severity = 'error';
+        } else if (event.summary.includes('success') || event.summary.includes('active')) {
+          severity = 'success';
+        } else if (event.summary.includes('pending') || event.summary.includes('in_progress') || event.summary.includes('queued')) {
+          severity = 'warning';
+        } else {
+          severity = 'info';
+        }
+      } else if (event.type === 'push') {
+        severity = 'info';
+      } else if (event.type === 'pr_opened') {
+        severity = 'info';
+      } else if (event.type === 'pr_closed') {
+        severity = event.summary.includes('merged') ? 'success' : 'warning';
+      } else if (event.type === 'star') {
+        severity = event.summary.includes('unstarred') ? 'warning' : 'success';
+      } else if (event.type === 'issue') {
+        if (event.action === 'opened') severity = 'warning';
+        else if (event.action === 'closed') severity = 'success';
+        else severity = 'info';
+      }
 
       const notifRef = db.collection('notifications').doc();
       batch.set(notifRef, {

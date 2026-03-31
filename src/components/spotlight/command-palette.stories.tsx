@@ -5,7 +5,7 @@ import { CommandPalette, type SpotlightAction } from './command-palette';
 const SAMPLE_ACTIONS: SpotlightAction[] = [
   { id: 'nav-dashboard', label: 'Dashboard', icon: '📊', group: 'Navigation', onSelect: () => {} },
   { id: 'nav-github', label: 'GitHub Activity', icon: '🐙', group: 'Navigation', onSelect: () => {} },
-  { id: 'nav-deploys', label: 'Deployments', icon: '🚀', group: 'Navigation', onSelect: () => {} },
+  { id: 'nav-deploys', label: 'Vercel Deployments', icon: '🚀', group: 'Navigation', onSelect: () => {} },
   { id: 'nav-firebase', label: 'Firebase', icon: '🔥', group: 'Navigation', onSelect: () => {} },
   { id: 'nav-alerts', label: 'Alerts', icon: '🔔', group: 'Navigation', onSelect: () => {} },
   { id: 'toggle-theme', label: 'Switch to Light Mode', icon: '☀️', group: 'Actions', keywords: 'theme dark light', onSelect: () => {} },

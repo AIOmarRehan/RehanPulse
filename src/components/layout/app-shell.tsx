@@ -24,7 +24,7 @@ import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 const NAV_ITEMS = [
   { darkIcon: '/macos-icons/activity-timeline.png', lightIcon: '/macos-icons/activity-timeline.png', label: 'Dashboard', id: 'dashboard' },
   { darkIcon: '/macos-icons/github_darkmode.png', lightIcon: '/macos-icons/github_lightmode.png', label: 'GitHub Activity', id: 'github' },
-  { darkIcon: '/macos-icons/deploy_darkmode.png', lightIcon: '/macos-icons/deploy_lightmode.png', label: 'Deployments', id: 'deploys' },
+  { darkIcon: '/macos-icons/deploy_darkmode.png', lightIcon: '/macos-icons/deploy_lightmode.png', label: 'Vercel Deployments', id: 'deploys' },
   { darkIcon: '/macos-icons/firebase.png', lightIcon: '/macos-icons/firebase.png', label: 'Firebase', id: 'firebase' },
   { darkIcon: '/macos-icons/smartalerts_darkmode.png', lightIcon: '/macos-icons/smartalerts_lightmode.png', label: 'Alerts', id: 'alerts' },
   { darkIcon: '/macos-icons/settings-darkmode.png', lightIcon: '/macos-icons/settings-lightmode.png', label: 'Settings', id: 'settings' },

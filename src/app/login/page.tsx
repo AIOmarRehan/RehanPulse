@@ -242,7 +242,7 @@ function LoginContent() {
             <div className="grid w-full grid-cols-4 gap-3">
               {[
                 { darkIcon: '/macos-icons/github_darkmode.png', lightIcon: '/macos-icons/github_lightmode.png', label: 'GitHub Activity' },
-                { darkIcon: '/macos-icons/deploy_darkmode.png', lightIcon: '/macos-icons/deploy_lightmode.png', label: 'Deployments' },
+                { darkIcon: '/macos-icons/deploy_darkmode.png', lightIcon: '/macos-icons/deploy_lightmode.png', label: 'Vercel Deployments' },
                 { darkIcon: '/macos-icons/firebase.png', lightIcon: '/macos-icons/firebase.png', label: 'Firebase Metrics' },
                 { darkIcon: '/macos-icons/vercel.png', lightIcon: '/macos-icons/vercel.png', label: 'Vercel Metrics' },
               ].map((item) => (

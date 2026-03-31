@@ -2118,7 +2118,7 @@ export function SettingsContent() {
           <p>
             <strong className="text-gray-600 dark:text-white/50">Vercel:</strong>{' '}
             Enter your personal API token above. It&apos;s validated, encrypted, and stored per-user.
-            Your deployments will appear on the Dashboard and Deployments page automatically.
+            Your deployments will appear on the Dashboard and Vercel Deployments page automatically.
           </p>
           <p>
             <strong className="text-gray-600 dark:text-white/50">Live Events:</strong>{' '}

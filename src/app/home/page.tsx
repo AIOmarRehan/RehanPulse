@@ -93,7 +93,7 @@ function useCursorGlow(ref: React.RefObject<HTMLElement | null>) {
 }
 
 /* ─── Mocked Dashboard Preview ─── */
-const DEMO_TABS = ['Dashboard', 'GitHub', 'Deployments', 'Usage'] as const;
+const DEMO_TABS = ['Dashboard', 'GitHub', 'Vercel Deployments', 'Usage'] as const;
 
 /* ─── Demo Contribution Grid ─── */
 const CONTRIB_COLORS = [
@@ -243,7 +243,7 @@ function DemoSlide({ tab }: { tab: typeof DEMO_TABS[number] }) {
       </div>
     );
   }
-  if (tab === 'Deployments') {
+  if (tab === 'Vercel Deployments') {
     return (
       <div className="space-y-2">
         {[

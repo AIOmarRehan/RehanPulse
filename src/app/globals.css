@@ -2,11 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* TODO: Remove after deployment alert testing */
-.intentional-build-error {
-  @apply bg-nonexistent-class-xyz;
-}
-
 html {
   scroll-behavior: smooth;
 }

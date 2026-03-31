@@ -139,6 +139,16 @@ function extractGroupKey(eventType: string, repo: string, payload: unknown): str
       const sha = cr?.head_sha as string | undefined;
       return sha ? `${repo}:${sha.slice(0, 12)}` : null;
     }
+    case 'deployment': {
+      const dep = p.deployment as Record<string, unknown> | undefined;
+      const sha = dep?.sha as string | undefined;
+      return sha ? `${repo}:${sha.slice(0, 12)}` : null;
+    }
+    case 'deployment_status': {
+      const dep = p.deployment as Record<string, unknown> | undefined;
+      const sha = dep?.sha as string | undefined;
+      return sha ? `${repo}:${sha.slice(0, 12)}` : null;
+    }
     default:
       return null;
   }
@@ -167,6 +177,16 @@ function extractGroupTitle(eventType: string, repo: string, payload: unknown): s
       const headCommit = checkSuite?.head_commit as Record<string, unknown> | undefined;
       const msg = (headCommit?.message as string | undefined)?.split('\n')[0] ?? '';
       return msg ? `${repoShort} — ${msg}` : `${repoShort}`;
+    }
+    case 'deployment': {
+      const dep = p.deployment as Record<string, unknown> | undefined;
+      const sha = dep?.sha as string | undefined;
+      return sha ? `${repoShort} — deploy ${sha.slice(0, 7)}` : `${repoShort}`;
+    }
+    case 'deployment_status': {
+      const dep = p.deployment as Record<string, unknown> | undefined;
+      const sha = dep?.sha as string | undefined;
+      return sha ? `${repoShort} — deploy ${sha.slice(0, 7)}` : `${repoShort}`;
     }
     default:
       return null;
@@ -211,7 +231,9 @@ function buildSummary(eventType: string, action: string | undefined, payload: un
       const cr = p.check_run as Record<string, unknown> | undefined;
       const name = cr?.name as string | undefined;
       const conclusion = cr?.conclusion as string | undefined;
-      return `CI: ${name ?? 'check'} — ${conclusion ?? action ?? 'running'} in ${repoName}`;
+      const status = cr?.status as string | undefined;
+      const label = conclusion ?? (status === 'in_progress' ? 'in progress' : (action ?? 'running'));
+      return `CI: ${name ?? 'check'} — ${label} in ${repoName}`;
     }
     case 'star': {
       const sender = (p.sender as Record<string, unknown> | undefined)?.login as string | undefined;
@@ -236,10 +258,12 @@ function buildSummary(eventType: string, action: string | undefined, payload: un
       const wr = p.workflow_run as Record<string, unknown> | undefined;
       const name = wr?.name as string | undefined;
       const conclusion = wr?.conclusion as string | undefined;
+      const status = wr?.status as string | undefined;
       if (action === 'completed' && conclusion) {
         return `CI: ${name ?? 'workflow'} — ${conclusion} in ${repoName}`;
       }
-      return `CI: ${name ?? 'workflow'} — ${action ?? 'running'} in ${repoName}`;
+      const label = status === 'in_progress' ? 'in progress' : (action ?? 'running');
+      return `CI: ${name ?? 'workflow'} — ${label} in ${repoName}`;
     }
     default:
       return `${eventType}${action ? `: ${action}` : ''}${repoName ? ` in ${repoName}` : ''}`;
@@ -262,17 +286,18 @@ async function evaluateAlertRules(
 ) {
   try {
     // ── Skip noisy intermediate events that aren't actionable ──
-    // CI: only notify on 'completed' (skip 'created', 'in_progress', 'requested', 'rerequested')
+    // CI: notify on 'completed' and 'in_progress' (skip 'created', 'requested', 'rerequested')
     if (event.type === 'ci') {
-      if (event.action !== 'completed') {
-        console.log(`[Alert] Skipping CI event with action=${event.action} (only 'completed' triggers alerts)`);
+      if (event.action !== 'completed' && event.action !== 'in_progress') {
+        console.log(`[Alert] Skipping CI event with action=${event.action} (only 'completed'/'in_progress' trigger alerts)`);
         return;
       }
     }
-    // Deployment: only notify on actual status changes, not every action
+    // Deployment: let deployment_status through (carries actual state), only filter bare deployment events
     if (event.eventType === 'deployment' && event.action && !['created'].includes(event.action)) {
       return;
     }
+    // deployment_status always passes through — its state (success/failure/error/pending) is the signal
     // PR: skip non-meaningful actions (synchronize, labeled, etc.)
     if (event.eventType === 'pull_request') {
       if (event.type === 'pr_updated') return; // only opened/closed matter
@@ -301,8 +326,10 @@ async function evaluateAlertRules(
       let severity: 'error' | 'warning' | 'info' | 'success' = 'info';
 
       if (event.type === 'ci') {
-        // CI: severity from conclusion
-        if (event.summary.includes('— failure') || event.summary.includes('— timed_out') || event.summary.includes('— cancelled') || event.summary.includes('— startup_failure')) {
+        // CI: severity from conclusion or action
+        if (event.action === 'in_progress' || event.summary.includes('— in progress')) {
+          severity = 'warning';
+        } else if (event.summary.includes('— failure') || event.summary.includes('— timed_out') || event.summary.includes('— cancelled') || event.summary.includes('— startup_failure')) {
           severity = 'error';
         } else if (event.summary.includes('— success')) {
           severity = 'success';

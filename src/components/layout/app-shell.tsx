@@ -178,7 +178,7 @@ export function AppShell() {
     {
       id: 'open-chat',
       label: 'Open AI Chat',
-      icon: <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>,
+      icon: <div className="h-4 w-4 [filter:brightness(0)_saturate(100%)_invert(45%)_sepia(7%)_saturate(487%)_hue-rotate(182deg)_brightness(95%)_contrast(90%)] dark:[filter:brightness(0)_saturate(100%)_invert(46%)_sepia(3%)_saturate(528%)_hue-rotate(202deg)_brightness(91%)_contrast(87%)]"><DotLottieReact src="/animated-icons/pulse.lottie" autoplay loop style={{ width: 16, height: 16 }} /></div>,
       group: 'Actions',
       keywords: 'ai chat pulse assistant chatbot',
       onSelect: () => setChatOpen(true),

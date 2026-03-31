@@ -143,16 +143,21 @@ export async function POST(request: NextRequest) {
     });
 
     // Create notification if user has a 'deployment' alert rule enabled
+    // Only filter by uid in Firestore to avoid needing composite indexes,
+    // then filter enabled + eventType in JavaScript
     const rulesSnap = await db
       .collection('alert_rules')
       .where('uid', '==', uid)
-      .where('enabled', '==', true)
-      .where('eventType', '==', 'deployment')
       .get();
 
-    if (!rulesSnap.empty) {
+    const matchingRules = rulesSnap.docs.filter((doc) => {
+      const d = doc.data() as { enabled?: boolean; eventType?: string };
+      return d.enabled === true && d.eventType === 'deployment';
+    });
+
+    if (matchingRules.length > 0) {
       const batch = db.batch();
-      for (const ruleDoc of rulesSnap.docs) {
+      for (const ruleDoc of matchingRules) {
         const rule = ruleDoc.data() as { name: string };
         const notifRef = db.collection('notifications').doc();
         batch.set(notifRef, {
@@ -169,7 +174,7 @@ export async function POST(request: NextRequest) {
         });
       }
       await batch.commit();
-      console.log(`[Vercel Webhook] Created ${rulesSnap.size} notification(s)`);
+      console.log(`[Vercel Webhook] Created ${matchingRules.length} notification(s)`);
     }
 
     return NextResponse.json({ received: true, event: eventType });

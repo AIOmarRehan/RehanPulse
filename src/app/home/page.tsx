@@ -1,8 +1,5 @@
 'use client';
 
-// TODO: Remove after deployment alert testing
-import { nonExistentExport } from 'react';
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, useInView, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';

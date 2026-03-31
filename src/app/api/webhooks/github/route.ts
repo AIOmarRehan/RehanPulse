@@ -110,6 +110,7 @@ export async function POST(request: NextRequest) {
     });
 
     // ── Alert evaluation: check rules and create notifications ──
+    console.log(`[Webhook] ${eventType}/${action ?? '-'} → type=${event.type} from ${event.repo ?? 'unknown'} by ${event.sender ?? 'unknown'}`);
     await evaluateAlertRules(db, event);
 
     return NextResponse.json({ received: true, event: event.type });
@@ -263,7 +264,10 @@ async function evaluateAlertRules(
     // ── Skip noisy intermediate events that aren't actionable ──
     // CI: only notify on 'completed' (skip 'created', 'in_progress', 'requested', 'rerequested')
     if (event.type === 'ci') {
-      if (event.action !== 'completed') return;
+      if (event.action !== 'completed') {
+        console.log(`[Alert] Skipping CI event with action=${event.action} (only 'completed' triggers alerts)`);
+        return;
+      }
     }
     // Deployment: only notify on actual status changes, not every action
     if (event.eventType === 'deployment' && event.action && !['created'].includes(event.action)) {
@@ -281,7 +285,12 @@ async function evaluateAlertRules(
       .where('eventType', '==', event.type)
       .get();
 
-    if (rulesSnap.empty) return;
+    if (rulesSnap.empty) {
+      console.log(`[Alert] No enabled rules found for eventType=${event.type}`);
+      return;
+    }
+
+    console.log(`[Alert] Found ${rulesSnap.size} matching rule(s) for eventType=${event.type}`);
 
     const batch = db.batch();
 

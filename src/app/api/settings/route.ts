@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase-admin';
 import { encrypt, decrypt } from '@/lib/crypto';
 import { registerWebhooksForUser } from '@/lib/github';
+import { registerVercelWebhook } from '@/lib/vercel';
 
 export const dynamic = 'force-dynamic';
 
@@ -118,6 +119,27 @@ export async function POST(request: NextRequest) {
         );
       }
       updates.vercelTokenEncrypted = encrypt(body.vercelToken);
+
+      // Auto-register Vercel webhook for deployment events
+      const appUrl = request.headers.get('origin') ?? request.nextUrl.origin;
+      const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:|$)/.test(appUrl);
+      if (!isLocalhost) {
+        const vercelWebhookUrl = `${appUrl}/api/webhooks/vercel?uid=${uid}`;
+        registerVercelWebhook(body.vercelToken, vercelWebhookUrl)
+          .then(async (result) => {
+            if (result) {
+              await db.collection('users').doc(uid).set(
+                {
+                  vercelWebhookId: result.id,
+                  vercelWebhookSecret: result.secret,
+                },
+                { merge: true },
+              );
+              console.log('Vercel webhook registered:', result.id);
+            }
+          })
+          .catch((err) => console.error('Vercel webhook registration failed:', err));
+      }
     }
 
     await db.collection('users').doc(uid).set(updates, { merge: true });

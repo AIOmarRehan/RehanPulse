@@ -71,6 +71,12 @@ export async function POST(request: NextRequest) {
         ? ((payload as Record<string, unknown>).sender as Record<string, unknown> | undefined)?.login as string | undefined
         : undefined;
 
+    // Extract deployment state directly from payload for reliable detection
+    const deploymentState =
+      eventType === 'deployment_status' && typeof payload === 'object' && payload !== null
+        ? ((payload as Record<string, unknown>).deployment_status as Record<string, unknown> | undefined)?.state as string ?? null
+        : null;
+
     const event = {
       deliveryId,
       eventType,
@@ -83,6 +89,7 @@ export async function POST(request: NextRequest) {
       summary: buildSummary(eventType, action, payload),
       groupKey: extractGroupKey(eventType, repoName ?? '', payload),
       groupTitle: extractGroupTitle(eventType, repoName ?? '', payload),
+      deploymentState,
     };
 
     // Write to Firestore via Admin SDK (bypasses security rules)
@@ -110,8 +117,8 @@ export async function POST(request: NextRequest) {
     });
 
     // ── Alert evaluation: check rules and create notifications ──
-    console.log(`[Webhook] ${eventType}/${action ?? '-'} → type=${event.type} from ${event.repo ?? 'unknown'} by ${event.sender ?? 'unknown'}`);
-    await evaluateAlertRules(db, event);
+    console.log(`[Webhook] ${eventType}/${action ?? '-'} → type=${event.type} from ${event.repo ?? 'unknown'} by ${event.sender ?? 'unknown'} uid=${eventUid ?? 'none'}`);
+    await evaluateAlertRules(db, event, eventUid);
 
     return NextResponse.json({ received: true, event: event.type });
   } catch (error) {
@@ -303,9 +310,17 @@ async function evaluateAlertRules(
     repo: string | null;
     groupKey: string | null;
     groupTitle: string | null;
+    deploymentState: string | null;
   },
+  uid: string | null,
 ) {
   try {
+    // Must have a resolved user to create notifications
+    if (!uid) {
+      console.log('[Alert] No uid resolved for repo — skipping alert evaluation');
+      return;
+    }
+
     // ── Skip noisy intermediate events that aren't actionable ──
     // CI: notify on 'completed' and 'in_progress' (skip 'created', 'requested', 'rerequested')
     if (event.type === 'ci') {
@@ -321,14 +336,12 @@ async function evaluateAlertRules(
     // deployment_status: only let FINAL states through (success/failure/error)
     // Skip intermediate states (pending, in_progress, queued, inactive) to avoid noise
     if (event.eventType === 'deployment_status') {
-      const isFinal = event.summary.includes('Vercel: success') ||
-                      event.summary.includes('Vercel: failure') ||
-                      event.summary.includes('Vercel: error');
-      if (!isFinal) {
-        console.log(`[Alert] Skipping non-final deployment_status: ${event.summary.slice(0, 80)}`);
+      const state = event.deploymentState ?? '';
+      if (!['success', 'failure', 'error'].includes(state)) {
+        console.log(`[Alert] Skipping non-final deployment_status: state=${state}`);
         return;
       }
-      console.log(`[Alert] Final deployment_status received: ${event.summary.slice(0, 80)}`);
+      console.log(`[Alert] Final deployment_status received: state=${state}`);
     }
     // PR: skip non-meaningful actions (synchronize, labeled, etc.)
     if (event.eventType === 'pull_request') {
@@ -343,9 +356,10 @@ async function evaluateAlertRules(
       source = 'vercel';
     }
 
-    // Find all enabled rules that match this event type
+    // Find enabled rules for THIS user that match the event type
     const rulesSnap = await db
       .collection('alert_rules')
+      .where('uid', '==', uid)
       .where('enabled', '==', true)
       .where('eventType', '==', event.type)
       .get();
@@ -379,10 +393,10 @@ async function evaluateAlertRules(
           severity = 'warning';
         }
       } else if (event.type === 'deployment') {
-        // Deployment status: severity from state
-        if (event.summary.includes('failure') || event.summary.includes('error')) {
+        // Deployment status: severity from raw state (not summary text)
+        if (event.deploymentState === 'failure' || event.deploymentState === 'error') {
           severity = 'error';
-        } else if (event.summary.includes('success') || event.summary.includes('active')) {
+        } else if (event.deploymentState === 'success') {
           severity = 'success';
         } else {
           severity = 'warning'; // deployment created or pending → treat as in-progress

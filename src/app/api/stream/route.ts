@@ -36,9 +36,11 @@ export async function GET(request: NextRequest) {
       }, 30_000);
 
       // Listen for new webhook events filtered to this user
-      unsubscribe = db
+      // orderBy ensures we get the most recent events reliably
+      const unsubWebhooks = db
         .collection('webhook_events')
         .where('uid', '==', uid)
+        .orderBy('createdAt', 'desc')
         .limit(50)
         .onSnapshot(
           (snapshot) => {
@@ -51,18 +53,19 @@ export async function GET(request: NextRequest) {
                 };
                 try {
                   controller.enqueue(
-                    encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
+                    encoder.encode(`event: webhook\ndata: ${JSON.stringify(event)}\n\n`),
                   );
                 } catch {
                   // Stream closed
                   clearInterval(heartbeat);
-                  unsubscribe?.();
+                  unsubWebhooks();
+                  unsubNotifs();
                 }
               }
             }
           },
           (error) => {
-            console.error('Firestore snapshot error:', error);
+            console.error('Firestore webhook snapshot error:', error);
             clearInterval(heartbeat);
             try {
               controller.close();
@@ -71,6 +74,39 @@ export async function GET(request: NextRequest) {
             }
           },
         );
+
+      // Listen for new notifications — eliminates race condition between
+      // webhook_event write and notification creation
+      const unsubNotifs = db
+        .collection('notifications')
+        .where('uid', '==', uid)
+        .orderBy('createdAt', 'desc')
+        .limit(20)
+        .onSnapshot(
+          (snapshot) => {
+            for (const change of snapshot.docChanges()) {
+              if (change.type === 'added' || change.type === 'modified') {
+                try {
+                  controller.enqueue(
+                    encoder.encode(`event: notification\ndata: ${JSON.stringify({ id: change.doc.id, type: change.type })}\n\n`),
+                  );
+                } catch {
+                  clearInterval(heartbeat);
+                  unsubWebhooks();
+                  unsubNotifs();
+                }
+              }
+            }
+          },
+          (error) => {
+            console.error('Firestore notification snapshot error:', error);
+          },
+        );
+
+      unsubscribe = () => {
+        unsubWebhooks();
+        unsubNotifs();
+      };
 
       // Clean up when client disconnects
       request.signal.addEventListener('abort', () => {

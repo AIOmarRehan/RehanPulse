@@ -11,6 +11,7 @@ const BASE_DELAY = 1000; // 1s
  * Custom hook that connects to the SSE endpoint at /api/stream.
  * Auto-reconnects with exponential backoff on disconnect.
  * Pushes events into the Zustand store.
+ * Listens for named events: 'webhook' (event store) and 'notification' (query invalidation).
  */
 export function useEventSource() {
   const addEvent = useEventStore((s) => s.addEvent);
@@ -21,6 +22,7 @@ export function useEventSource() {
   const esRef = useRef<EventSource | null>(null);
   const mountedRef = useRef(true);
   const initialLoadRef = useRef(true);
+  const pendingInvalidation = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const connect = useCallback(() => {
     if (!mountedRef.current) return;
@@ -37,19 +39,28 @@ export function useEventSource() {
       setTimeout(() => { initialLoadRef.current = false; }, 2000);
     };
 
-    es.onmessage = (event) => {
+    // Named event: webhook events → add to event store
+    es.addEventListener('webhook', (event: MessageEvent) => {
       try {
         const data = JSON.parse(event.data as string) as WebhookEvent;
         addEvent(data);
-        // When a new webhook event arrives (not initial load), refetch notifications
-        // because evaluateAlertRules likely created a matching notification
-        if (!initialLoadRef.current) {
-          queryClient.invalidateQueries({ queryKey: ['notifications'] });
-        }
       } catch {
         // Ignore malformed messages
       }
-    };
+    });
+
+    // Named event: notification changes → debounced query invalidation
+    // This fires AFTER the notification document exists in Firestore,
+    // eliminating the race condition with evaluateAlertRules
+    es.addEventListener('notification', () => {
+      if (initialLoadRef.current) return;
+      // Debounce: batch rapid notification events (e.g., CI + Vercel from same push)
+      if (pendingInvalidation.current) clearTimeout(pendingInvalidation.current);
+      pendingInvalidation.current = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        pendingInvalidation.current = null;
+      }, 300);
+    });
 
     es.onerror = () => {
       es.close();
@@ -73,6 +84,7 @@ export function useEventSource() {
       mountedRef.current = false;
       esRef.current?.close();
       setConnected(false);
+      if (pendingInvalidation.current) clearTimeout(pendingInvalidation.current);
     };
   }, [connect, setConnected]);
 }

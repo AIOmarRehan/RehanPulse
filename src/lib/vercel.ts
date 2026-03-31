@@ -191,3 +191,65 @@ export async function fetchProjects(uid: string): Promise<VercelProject[]> {
 
   return projects;
 }
+
+/**
+ * Auto-register a Vercel webhook for deployment events.
+ * Creates or updates a webhook pointing at our /api/webhooks/vercel endpoint.
+ * Returns the webhook secret for signature verification.
+ */
+export async function registerVercelWebhook(
+  vercelToken: string,
+  webhookUrl: string,
+): Promise<{ id: string; secret: string } | null> {
+  try {
+    // List existing webhooks to check if one already exists for our URL
+    const listRes = await fetch(`${VERCEL_API}/v1/webhooks`, {
+      headers: { Authorization: `Bearer ${vercelToken}` },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT),
+    });
+
+    if (listRes.ok) {
+      const listJson = (await listRes.json()) as Array<{ id: string; url: string }>;
+      const existing = listJson.find((h) => h.url === webhookUrl);
+      if (existing) {
+        // Already registered — no secret returned from list, so delete and re-create
+        await fetch(`${VERCEL_API}/v1/webhooks/${existing.id}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${vercelToken}` },
+          signal: AbortSignal.timeout(FETCH_TIMEOUT),
+        });
+      }
+    }
+
+    // Create the webhook — Vercel returns a secret for signature verification
+    const createRes = await fetch(`${VERCEL_API}/v1/webhooks`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${vercelToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url: webhookUrl,
+        events: [
+          'deployment.created',
+          'deployment.ready',
+          'deployment.error',
+          'deployment.canceled',
+        ],
+      }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT),
+    });
+
+    if (!createRes.ok) {
+      const errText = await createRes.text();
+      console.error('Failed to create Vercel webhook:', createRes.status, errText);
+      return null;
+    }
+
+    const result = (await createRes.json()) as { id: string; secret: string };
+    return { id: result.id, secret: result.secret };
+  } catch (err) {
+    console.error('Vercel webhook registration error:', err);
+    return null;
+  }
+}

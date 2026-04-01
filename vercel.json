@@ -1,1 +1,16 @@
-{}
+{
+  "functions": {
+    "src/app/api/stream/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/github/route.ts": {
+      "maxDuration": 15
+    },
+    "src/app/api/vercel/track/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/webhooks/vercel/route.ts": {
+      "maxDuration": 30
+    }
+  }
+}

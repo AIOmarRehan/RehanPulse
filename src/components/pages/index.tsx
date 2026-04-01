@@ -15,6 +15,13 @@ import type { VercelDeployment, VercelProject, VercelUsage } from '@/lib/vercel'
 
 const fadeIn = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } };
 
+/** Run all sync promises with a 20-second safety timeout. */
+const syncWithTimeout = (promises: Promise<unknown>[]) =>
+  Promise.race([
+    Promise.allSettled(promises),
+    new Promise((r) => setTimeout(r, 20_000)),
+  ]);
+
 /* ─── Theme-aware icon helper ─── */
 function ThemeIcon({ dark, light, alt, size = 16 }: { dark: string; light: string; alt: string; size?: number }) {
   return (
@@ -541,13 +548,12 @@ function LiveEventsWidget() {
 
 /* ─── Dashboard ─── */
 export function DashboardContent({ userName }: { userName?: string }) {
-  const { data, isLoading, refresh } = useGitHubData();
+  const { data, isLoading, error: githubError, refresh } = useGitHubData();
   const { data: vercelData, isLoading: vercelLoading, error: vercelError, refresh: refreshVercel } = useVercelData();
   const { refresh: refreshFirebase } = useFirebaseData();
   const { refresh: refreshAlerts } = useAlertRules();
   const { refresh: refreshNotifications } = useNotifications();
   const [refreshing, setRefreshing] = useState(false);
-  const clearEvents = useEventStore((s) => s.clearEvents);
 
   const totalCommits = useMemo(() => {
     if (!data?.repos) return 0;
@@ -563,22 +569,24 @@ export function DashboardContent({ userName }: { userName?: string }) {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    clearEvents();
-    try { await Promise.all([refresh(), refreshVercel(), refreshFirebase(), refreshAlerts(), refreshNotifications()]); } catch { /* ignore */ }
+    try { await syncWithTimeout([refresh(), refreshVercel(), refreshFirebase(), refreshAlerts(), refreshNotifications()]); } catch { /* ignore */ }
     finally { setRefreshing(false); }
   };
 
   const renderWidget = (widget: WidgetConfig) => {
     if (widget.id === 'commits') {
       if (isLoading) return <WidgetSkeleton />;
+      if (githubError) return <WidgetError message={githubError instanceof Error ? githubError.message : 'Failed to load GitHub data'} />;
       return <CommitsList commits={data?.commits ?? []} />;
     }
     if (widget.id === 'prs') {
       if (isLoading) return <WidgetSkeleton />;
+      if (githubError) return <WidgetError message={githubError instanceof Error ? githubError.message : 'Failed to load pull requests'} />;
       return <PRsList prs={data?.pullRequests ?? []} />;
     }
     if (widget.id === 'rate-limit') {
       if (isLoading) return <WidgetSkeleton />;
+      if (githubError) return <WidgetError message={githubError instanceof Error ? githubError.message : 'Failed to load rate limit'} />;
       return <RateLimitWidget rateLimit={data?.rateLimit} />;
     }
     if (widget.id === 'deploys') {
@@ -592,6 +600,7 @@ export function DashboardContent({ userName }: { userName?: string }) {
     }
     if (widget.id === 'activity') {
       if (isLoading) return <WidgetSkeleton />;
+      if (githubError) return <div className="h-[148px]"><WidgetError message={githubError instanceof Error ? githubError.message : 'Failed to load contributions'} /></div>;
       return <div className="h-[148px]"><ActivityTimeline contributions={data?.contributions ?? []} /></div>;
     }
     if (widget.id === 'live-events') {
@@ -644,6 +653,15 @@ function WidgetSkeleton() {
   );
 }
 
+function WidgetError({ message }: { message: string }) {
+  const isNoToken = message.includes('No GitHub token') || message.includes('GitHub API failed');
+  return (
+    <p className="text-xs text-gray-400 dark:text-white/30">
+      {isNoToken ? 'Connect your GitHub account in Settings to see data.' : message}
+    </p>
+  );
+}
+
 /* ─── GitHub Activity ─── */
 export function GitHubContent() {
   const { data, isLoading, error, refresh } = useGitHubData();
@@ -652,7 +670,6 @@ export function GitHubContent() {
   const { refresh: refreshAlerts } = useAlertRules();
   const { refresh: refreshNotifications } = useNotifications();
   const [refreshing, setRefreshing] = useState(false);
-  const clearEvents = useEventStore((s) => s.clearEvents);
 
   const totalCommits = useMemo(() => {
     if (!data?.repos) return 0;
@@ -661,8 +678,7 @@ export function GitHubContent() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    clearEvents();
-    try { await Promise.all([refresh(), refreshVercel(), refreshFirebase(), refreshAlerts(), refreshNotifications()]); } catch { /* ignore */ }
+    try { await syncWithTimeout([refresh(), refreshVercel(), refreshFirebase(), refreshAlerts(), refreshNotifications()]); } catch { /* ignore */ }
     finally { setRefreshing(false); }
   };
 
@@ -854,7 +870,7 @@ export function DeploymentsContent() {
 
   const handleSync = async () => {
     setRefreshing(true);
-    try { await Promise.all([refreshGitHub(), refreshVercel(), refreshFirebase(), refreshAlerts(), refreshNotifications()]); } catch { /* ignore */ }
+    try { await syncWithTimeout([refreshGitHub(), refreshVercel(), refreshFirebase(), refreshAlerts(), refreshNotifications()]); } catch { /* ignore */ }
     finally { setRefreshing(false); }
   };
   const deployments = vercelData?.deployments ?? [];
@@ -1048,7 +1064,7 @@ export function FirebaseContent() {
 
   const handleSync = async () => {
     setRefreshing(true);
-    try { await Promise.all([refreshGitHub(), refreshVercel(), refreshFirebase(), refreshAlerts(), refreshNotifications()]); } catch { /* ignore */ }
+    try { await syncWithTimeout([refreshGitHub(), refreshVercel(), refreshFirebase(), refreshAlerts(), refreshNotifications()]); } catch { /* ignore */ }
     finally { setRefreshing(false); }
   };
 
@@ -1340,7 +1356,7 @@ export function AlertsContent() {
 
   const handleSync = async () => {
     setRefreshing(true);
-    try { await Promise.all([refreshGitHub(), refreshVercel(), refreshFirebase(), refreshAlerts(), refreshNotifications()]); } catch { /* ignore */ }
+    try { await syncWithTimeout([refreshGitHub(), refreshVercel(), refreshFirebase(), refreshAlerts(), refreshNotifications()]); } catch { /* ignore */ }
     finally { setRefreshing(false); }
   };
   const [showAddRule, setShowAddRule] = useState(false);

@@ -73,30 +73,31 @@ export async function GET(request: NextRequest) {
           },
         );
 
-      // Listen for new notifications — eliminates race condition between
-      // webhook_event write and notification creation
+      // Listen for notification counter changes — single doc, very cheap.
+      // Each webhook handler bumps this counter when creating/updating notifications.
       const unsubNotifs = db
-        .collection('notifications')
-        .where('uid', '==', uid)
-        .limit(50)
+        .collection('notification_counters')
+        .doc(uid)
         .onSnapshot(
           (snapshot) => {
-            for (const change of snapshot.docChanges()) {
-              if (change.type === 'added' || change.type === 'modified') {
-                try {
-                  controller.enqueue(
-                    encoder.encode(`event: notification\ndata: ${JSON.stringify({ id: change.doc.id, type: change.type })}\n\n`),
-                  );
-                } catch {
-                  clearInterval(heartbeat);
-                  unsubWebhooks();
-                  unsubNotifs();
-                }
-              }
+            if (!snapshot.exists) return;
+            const data = snapshot.data() ?? {};
+            try {
+              controller.enqueue(
+                encoder.encode(`event: notification\ndata: ${JSON.stringify({
+                  type: 'counter',
+                  lastSource: data.lastSource ?? null,
+                  lastEventType: data.lastEventType ?? null,
+                })}\n\n`),
+              );
+            } catch {
+              clearInterval(heartbeat);
+              unsubWebhooks();
+              unsubNotifs();
             }
           },
           (error) => {
-            console.error('Firestore notification snapshot error:', error);
+            console.error('Notification counter snapshot error:', error);
           },
         );
 

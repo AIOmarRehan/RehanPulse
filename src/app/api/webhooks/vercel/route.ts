@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHmac, createHash, timingSafeEqual } from 'crypto';
 import { getAdminDb } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 /** Verify Vercel webhook x-vercel-signature HMAC SHA1. */
 function verifySignature(payload: string, signature: string | null, secret: string): boolean {
@@ -147,8 +148,44 @@ export async function POST(request: NextRequest) {
       uid,
     });
 
-    // Always create a notification — user opted in by registering Vercel webhook.
-    // Use rule name if available, otherwise default label.
+    // ── Determine if this is a push-triggered deploy or a redeploy ──
+    // For push-triggered deploys, the client-side track endpoint creates Vercel
+    // notifications grouped with the commit/CI notifications. Skip here.
+    // For redeploys (no recent push for this SHA), create standalone notifications.
+    let notifGroupKey = groupKey;
+    let notifGroupTitle = groupTitle;
+
+    if (meta?.githubCommitSha) {
+      const shaPrefix = meta.githubCommitSha.slice(0, 12);
+
+      // Direct doc lookup — 1 read instead of 100
+      const commitGroupKey = `${repoFullName ?? projectName}:${shaPrefix}`;
+      const commitDocId = notificationDocId(uid, commitGroupKey, 'commit:final');
+      const commitDoc = await db.collection('notifications').doc(commitDocId).get();
+      const TEN_MINUTES = 10 * 60 * 1000;
+      const hasRecentPush = commitDoc.exists && (() => {
+        const d = commitDoc.data() as { createdAt?: string };
+        const age = Date.now() - new Date(d.createdAt ?? '').getTime();
+        return age < TEN_MINUTES;
+      })();
+
+      if (hasRecentPush) {
+        // Push-triggered deploy — track endpoint will handle Vercel notifications
+        console.log(`[Vercel Webhook] Push-triggered deploy — skipping notification for ${projectName}`);
+        return NextResponse.json({ received: true, event: eventType });
+      }
+
+      // Redeploy: use deployment ID for unique grouping (not SHA)
+      if (deployment?.id) {
+        notifGroupKey = `vercel:${deployment.id}`;
+      }
+      notifGroupTitle = meta.githubCommitMessage
+        ? `${projectName} — Redeploy: ${meta.githubCommitMessage.split('\n')[0]}`
+        : `${projectName} — Redeploy`;
+      console.log(`[Vercel Webhook] Redeploy detected — groupKey=${notifGroupKey}`);
+    }
+
+    // Create notification for redeploy / standalone deploy.
     const rulesSnap = await db
       .collection('alert_rules')
       .where('uid', '==', uid)
@@ -171,22 +208,30 @@ export async function POST(request: NextRequest) {
       eventType: 'deployment',
       read: false,
       createdAt: new Date().toISOString(),
-      ...(groupKey ? { groupKey } : {}),
-      ...(groupTitle ? { groupTitle } : {}),
+      ...(deployment?.id ? { vercelDeploymentUid: deployment.id } : {}),
+      ...(notifGroupKey ? { groupKey: notifGroupKey } : {}),
+      ...(notifGroupTitle ? { groupTitle: notifGroupTitle } : {}),
       ...(repoFullName ? { repo: repoFullName } : {}),
     };
 
     // UPSERT: deterministic doc ID with lifecycle phase
     // deployment.created (progress) and deployment.ready (final) are SEPARATE notifications
-    // but duplicates of the SAME phase are still deduplicated
     const phase = eventType === 'deployment.created' ? 'progress' : 'final';
-    if (groupKey) {
-      const docId = notificationDocId(uid, groupKey, `vercel:${phase}`);
-      await db.collection('notifications').doc(docId).set(notifData);
+    if (notifGroupKey) {
+      const docId = notificationDocId(uid, notifGroupKey, `vercel:${phase}`);
+      await db.collection('notifications').doc(docId).set(notifData, { merge: true });
     } else {
       await db.collection('notifications').add(notifData);
     }
     console.log(`[Vercel Webhook] Upserted notification for ${eventType} (phase=${phase})`);
+
+    // Bump notification counter so SSE stream fires
+    await db.collection('notification_counters').doc(uid).set({
+      count: FieldValue.increment(1),
+      updatedAt: new Date().toISOString(),
+      lastSource: 'vercel',
+      lastEventType: 'deployment',
+    }, { merge: true });
 
     return NextResponse.json({ received: true, event: eventType });
   } catch (error) {

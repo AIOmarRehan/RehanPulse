@@ -197,11 +197,7 @@ export function useFirebaseData() {
 
     // refresh all firebase data
     refresh: useCallback(async () => {
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ['firebase-connection'] }),
-        qc.invalidateQueries({ queryKey: ['firebase-projects'] }),
-        qc.invalidateQueries({ queryKey: ['firebase-data'] }),
-      ]);
+      await qc.refetchQueries({ queryKey: ['firebase-connection'] });
     }, [qc]),
   };
 }

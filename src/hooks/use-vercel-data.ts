@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import type { VercelDeployment, VercelProject, VercelUsage } from '@/lib/vercel';
 
 interface VercelData {
@@ -10,18 +10,13 @@ interface VercelData {
   usage: VercelUsage | null;
 }
 
-async function fetchVercelData(limit?: number): Promise<VercelData> {
-  const url = limit ? `/api/vercel?limit=${limit}` : '/api/vercel';
-  const res = await fetch(url, { cache: 'no-store' });
-  if (!res.ok) {
-    throw new Error(`Vercel API failed: ${res.status}`);
-  }
-  return res.json() as Promise<VercelData>;
-}
-
-async function forceRefreshVercelData(limit?: number): Promise<VercelData> {
-  const url = limit ? `/api/vercel?limit=${limit}&force=1` : '/api/vercel?force=1';
-  const res = await fetch(url, { cache: 'no-store' });
+async function fetchVercelData(limit?: number, force = false): Promise<VercelData> {
+  const params = new URLSearchParams();
+  if (limit) params.set('limit', String(limit));
+  if (force) params.set('force', '1');
+  const qs = params.toString();
+  const url = qs ? `/api/vercel?${qs}` : '/api/vercel';
+  const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(15_000) });
   if (!res.ok) {
     throw new Error(`Vercel API failed: ${res.status}`);
   }
@@ -30,25 +25,28 @@ async function forceRefreshVercelData(limit?: number): Promise<VercelData> {
 
 /**
  * React Query hook for fetching Vercel deployment data.
- * Stale time: 30s. Refetches every 60s.
+ * Stale time: 30s. Refetches every 2 minutes.
  */
 export function useVercelData(limit?: number) {
   const queryClient = useQueryClient();
+  const forceRef = useRef(false);
 
   const query = useQuery({
     queryKey: ['vercel-data', limit ?? 10],
-    queryFn: () => fetchVercelData(limit),
+    queryFn: async () => {
+      const force = forceRef.current;
+      forceRef.current = false;
+      return fetchVercelData(limit, force);
+    },
     staleTime: 30_000,
     refetchInterval: 2 * 60_000,
     retry: 1,
   });
 
   const refresh = useCallback(async () => {
-    const freshData = await forceRefreshVercelData(limit);
-    // Update all vercel-data queries so every component sees fresh data
-    queryClient.setQueryData(['vercel-data', limit ?? 10], freshData);
+    forceRef.current = true;
     await queryClient.invalidateQueries({ queryKey: ['vercel-data'] });
-  }, [queryClient, limit]);
+  }, [queryClient]);
 
   return { ...query, refresh };
 }

@@ -15,6 +15,9 @@ export interface VercelDeployment {
   meta?: {
     githubCommitRef?: string;
     githubCommitMessage?: string;
+    githubCommitSha?: string;
+    githubOrg?: string;
+    githubRepo?: string;
   };
 }
 
@@ -73,6 +76,26 @@ export async function fetchDeployments(uid: string, limit = 10): Promise<VercelD
     ready: (d.ready as number | undefined) ?? undefined,
     meta: d.meta as VercelDeployment['meta'],
   }));
+}
+
+/**
+ * Find the Vercel deployment matching a commit SHA prefix.
+ * Returns null if the user has no Vercel token or no matching deployment.
+ */
+export async function findDeploymentByCommit(
+  uid: string,
+  commitShaPrefix: string,
+): Promise<VercelDeployment | null> {
+  try {
+    const deployments = await fetchDeployments(uid, 15);
+    return (
+      deployments.find((d) =>
+        d.meta?.githubCommitSha?.startsWith(commitShaPrefix),
+      ) ?? null
+    );
+  } catch {
+    return null;
+  }
 }
 
 /* ─── Usage types ─── */

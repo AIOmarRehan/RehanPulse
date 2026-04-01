@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHmac, createHash, timingSafeEqual } from 'crypto';
 import { getAdminDb } from '@/lib/firebase-admin';
+
+import { FieldValue } from 'firebase-admin/firestore';
 import type { Firestore } from 'firebase-admin/firestore';
 
 /** Verify GitHub webhook X-Hub-Signature-256 HMAC. */
@@ -334,10 +336,20 @@ async function evaluateAlertRules(
       return;
     }
 
-    // deployment/deployment_status from GitHub are redundant with Vercel webhook handler
-    if (event.eventType === 'deployment' || event.eventType === 'deployment_status') {
-      console.log(`[Alert] Skipping ${event.eventType} — Vercel webhook handles deployment lifecycle`);
+    // Bare 'deployment' events carry no status info — skip (deployment_status has the actual state)
+    if (event.eventType === 'deployment') {
+      console.log(`[Alert] Skipping bare deployment event — deployment_status carries the actual state`);
       return;
+    }
+
+    // deployment_status: only actionable states (pending = progress, success/failure/error = final)
+    if (event.eventType === 'deployment_status') {
+      const state = event.deploymentState ?? '';
+      if (!['pending', 'in_progress', 'success', 'failure', 'error'].includes(state)) {
+        console.log(`[Alert] Skipping deployment_status with state=${state}`);
+        return;
+      }
+      console.log(`[Alert] Processing deployment_status: state=${state}`);
     }
 
     // ── Skip noisy intermediate events ──
@@ -354,8 +366,12 @@ async function evaluateAlertRules(
     }
 
     // Determine notification source for nesting
-    // Note: 'vercel' source is handled exclusively by the Vercel webhook handler
-    const source: 'commit' | 'github-ci' = event.type === 'ci' ? 'github-ci' : 'commit';
+    let source: 'commit' | 'github-ci' | 'vercel' = 'commit';
+    if (event.type === 'ci') {
+      source = 'github-ci';
+    } else if (event.type === 'deployment') {
+      source = 'vercel';
+    }
 
     // Find enabled rules for THIS user that match the event type
     // Use single-field query to avoid composite index requirement, filter in JS
@@ -369,17 +385,23 @@ async function evaluateAlertRules(
       return d.enabled === true && d.eventType === event.type;
     });
 
-    if (matchingRules.length === 0) {
+    // For deployment events, always create a notification even without an alert rule
+    // (the user opted in by having deployment_status webhooks registered)
+    if (matchingRules.length === 0 && event.type !== 'deployment') {
       console.log(`[Alert] No enabled rules found for eventType=${event.type}`);
       return;
     }
 
-    console.log(`[Alert] Found ${matchingRules.length} matching rule(s) for eventType=${event.type}`);
+    // Use rule name if available, otherwise a sensible default
+    const ruleEntries = matchingRules.length > 0
+      ? matchingRules.map((d) => d.data() as { uid: string; name: string; eventType: string })
+      : [{ uid, name: event.type === 'deployment' ? 'Vercel Deployment' : event.type, eventType: event.type }];
+
+    console.log(`[Alert] Processing ${ruleEntries.length} rule(s) for eventType=${event.type}`);
 
     const batch = db.batch();
 
-    for (const ruleDoc of matchingRules) {
-      const rule = ruleDoc.data() as { uid: string; name: string; eventType: string };
+    for (const rule of ruleEntries) {
 
       // Determine severity based on event type and content
       let severity: 'error' | 'warning' | 'info' | 'success' = 'info';
@@ -396,6 +418,16 @@ async function evaluateAlertRules(
           severity = 'info';
         } else {
           severity = 'warning';
+        }
+      } else if (event.type === 'deployment') {
+        // Deployment status: severity from raw state
+        const state = event.deploymentState ?? '';
+        if (state === 'failure' || state === 'error') {
+          severity = 'error';
+        } else if (state === 'success') {
+          severity = 'success';
+        } else {
+          severity = 'warning'; // pending / in_progress → building
         }
       } else if (event.type === 'push') {
         severity = 'info';
@@ -425,20 +457,36 @@ async function evaluateAlertRules(
       };
 
       // UPSERT: deterministic doc ID with lifecycle phase
-      // CI in_progress and CI completed each get their OWN persistent notification
+      // progress and final each get their OWN persistent notification
       // but duplicates of the SAME phase are still deduplicated
       if (event.groupKey) {
-        const phase = (event.type === 'ci' && event.action === 'in_progress') ? 'progress' : 'final';
+        let phase = 'final';
+        if (event.type === 'ci' && event.action === 'in_progress') {
+          phase = 'progress';
+        } else if (event.type === 'deployment') {
+          const ds = event.deploymentState ?? '';
+          phase = ['pending', 'in_progress'].includes(ds) ? 'progress' : 'final';
+        }
         const docId = notificationDocId(rule.uid, event.groupKey, `${source}:${phase}`);
-        batch.set(db.collection('notifications').doc(docId), notifData);
+        batch.set(db.collection('notifications').doc(docId), notifData, { merge: true });
       } else {
-        batch.set(db.collection('notifications').doc(), notifData);
+        batch.set(db.collection('notifications').doc(), notifData, { merge: true });
       }
     }
 
     await batch.commit();
+
+    // Bump notification counter so SSE stream fires
+    await db.collection('notification_counters').doc(uid).set({
+      count: FieldValue.increment(1),
+      updatedAt: new Date().toISOString(),
+      lastSource: source,
+      lastEventType: event.type,
+    }, { merge: true });
   } catch (error) {
     // Don't fail the webhook response if alert evaluation fails
     console.error('Alert evaluation error:', error);
   }
 }
+
+

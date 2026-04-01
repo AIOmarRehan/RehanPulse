@@ -103,11 +103,18 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ deleted: 0 });
     }
 
+    // Hard-delete all notification docs (no soft-delete accumulation)
     const batch = db.batch();
     for (const doc of snap.docs) {
       batch.delete(doc.ref);
     }
     await batch.commit();
+
+    // Store clear timestamp so polling endpoints don't recreate ghost notifications
+    await db.collection('notification_state').doc(user.uid).set(
+      { lastClearedAt: new Date().toISOString() },
+      { merge: true },
+    );
 
     return NextResponse.json({ deleted: snap.size });
   } catch (error) {

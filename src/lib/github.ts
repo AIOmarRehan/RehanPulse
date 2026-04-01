@@ -152,7 +152,7 @@ export async function fetchRecentCommits(
   repos: GitHubRepo[],
   limit = 30,
 ): Promise<GitHubCommit[]> {
-  const topRepos = repos.slice(0, 15);
+  const topRepos = repos.slice(0, 10);
 
   // Get start of current week (Monday 00:00 UTC) for weekly timeline accuracy
   const now = new Date();
@@ -163,31 +163,30 @@ export async function fetchRecentCommits(
   monday.setUTCHours(0, 0, 0, 0);
   const since = monday.toISOString();
 
-  const allCommits: GitHubCommit[] = [];
-
-  for (const repo of topRepos) {
-    try {
+  // Fetch all repos in parallel
+  const results = await Promise.allSettled(
+    topRepos.map(async (repo) => {
       const [owner, repoName] = repo.full_name.split('/') as [string, string];
       const { data } = await octokit.rest.repos.listCommits({
         owner,
         repo: repoName,
         since,
-        per_page: 30,
+        per_page: 10,
       });
+      return data.map((c) => ({
+        sha: c.sha.slice(0, 7),
+        message: c.commit.message.split('\n')[0] ?? '',
+        author: c.commit.author?.name ?? 'Unknown',
+        date: c.commit.author?.date ?? new Date().toISOString(),
+        repo: repo.name,
+        html_url: c.html_url,
+      }));
+    }),
+  );
 
-      for (const c of data) {
-        allCommits.push({
-          sha: c.sha.slice(0, 7),
-          message: c.commit.message.split('\n')[0] ?? '',
-          author: c.commit.author?.name ?? 'Unknown',
-          date: c.commit.author?.date ?? new Date().toISOString(),
-          repo: repo.name,
-          html_url: c.html_url,
-        });
-      }
-    } catch {
-      // Skip repos we can't access
-    }
+  const allCommits: GitHubCommit[] = [];
+  for (const r of results) {
+    if (r.status === 'fulfilled') allCommits.push(...r.value);
   }
 
   return allCommits
@@ -201,12 +200,11 @@ export async function fetchOpenPRs(
   repos: GitHubRepo[],
   limit = 10,
 ): Promise<GitHubPR[]> {
-  const topRepos = repos.slice(0, 20);
+  const topRepos = repos.slice(0, 10);
 
-  const allPRs: GitHubPR[] = [];
-
-  for (const repo of topRepos) {
-    try {
+  // Fetch all repos in parallel
+  const results = await Promise.allSettled(
+    topRepos.map(async (repo) => {
       const [owner, repoName] = repo.full_name.split('/') as [string, string];
       const { data } = await octokit.rest.pulls.list({
         owner,
@@ -214,24 +212,24 @@ export async function fetchOpenPRs(
         state: 'open',
         per_page: 5,
       });
+      return data.map((pr) => ({
+        id: pr.id,
+        number: pr.number,
+        title: pr.title,
+        state: pr.state,
+        repo: repo.name,
+        author: pr.user?.login ?? 'Unknown',
+        created_at: pr.created_at,
+        updated_at: pr.updated_at,
+        html_url: pr.html_url,
+        draft: pr.draft ?? false,
+      }));
+    }),
+  );
 
-      for (const pr of data) {
-        allPRs.push({
-          id: pr.id,
-          number: pr.number,
-          title: pr.title,
-          state: pr.state,
-          repo: repo.name,
-          author: pr.user?.login ?? 'Unknown',
-          created_at: pr.created_at,
-          updated_at: pr.updated_at,
-          html_url: pr.html_url,
-          draft: pr.draft ?? false,
-        });
-      }
-    } catch {
-      // Skip repos we can't access
-    }
+  const allPRs: GitHubPR[] = [];
+  for (const r of results) {
+    if (r.status === 'fulfilled') allPRs.push(...r.value);
   }
 
   return allPRs

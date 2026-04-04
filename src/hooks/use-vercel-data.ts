@@ -10,6 +10,15 @@ interface VercelData {
   usage: VercelUsage | null;
 }
 
+// Module-level flag: when set, the next queryFn call will bypass the server cache.
+// Used by useEventSource to ensure deployment events get fresh data.
+let _bustServerCache = false;
+
+/** Call before invalidating vercel-data queries to bypass the 30s server cache. */
+export function bustVercelCache() {
+  _bustServerCache = true;
+}
+
 async function fetchVercelData(limit?: number, force = false): Promise<VercelData> {
   const params = new URLSearchParams();
   if (limit) params.set('limit', String(limit));
@@ -34,8 +43,9 @@ export function useVercelData(limit?: number) {
   const query = useQuery({
     queryKey: ['vercel-data', limit ?? 10],
     queryFn: async () => {
-      const force = forceRef.current;
+      const force = forceRef.current || _bustServerCache;
       forceRef.current = false;
+      _bustServerCache = false;
       return fetchVercelData(limit, force);
     },
     staleTime: 30_000,

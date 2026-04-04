@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEventStore, type WebhookEvent } from '@/lib/stores/event-store';
+import { bustVercelCache } from './use-vercel-data';
 
 const MAX_RETRIES = 10;
 const BASE_DELAY = 1000; // 1s
@@ -46,6 +47,7 @@ export function useEventSource() {
         const data = (await res.json()) as { tracked: number };
         if (data.tracked > 0) {
           queryClient.invalidateQueries({ queryKey: ['notifications'] });
+          bustVercelCache();
           queryClient.invalidateQueries({ queryKey: ['vercel-data'] });
         }
       }
@@ -111,6 +113,7 @@ export function useEventSource() {
         }
         // Auto-refresh Vercel overview card when deployment events arrive
         if (!initialLoadRef.current && data.type === 'deployment') {
+          bustVercelCache();
           queryClient.invalidateQueries({ queryKey: ['vercel-data'] });
         }
       } catch {
@@ -137,6 +140,7 @@ export function useEventSource() {
         queryClient.invalidateQueries({ queryKey: ['notifications'] });
         // Auto-refresh Vercel overview card when deployment notifications arrive
         if (lastSource === 'vercel' || lastEventType === 'deployment') {
+          bustVercelCache();
           queryClient.invalidateQueries({ queryKey: ['vercel-data'] });
         }
         pendingInvalidation.current = null;

@@ -149,11 +149,9 @@ export async function POST(request: NextRequest) {
     });
 
     // ── Determine if this is a push-triggered deploy or a redeploy ──
-    // For push-triggered deploys, the client-side track endpoint creates Vercel
-    // notifications grouped with the commit/CI notifications. Skip here.
-    // For redeploys (no recent push for this SHA), create standalone notifications.
     let notifGroupKey = groupKey;
     let notifGroupTitle = groupTitle;
+    let isPushTriggered = false;
 
     if (meta?.githubCommitSha) {
       const shaPrefix = meta.githubCommitSha.slice(0, 12);
@@ -170,22 +168,22 @@ export async function POST(request: NextRequest) {
       })();
 
       if (hasRecentPush) {
-        // Push-triggered deploy — track endpoint will handle Vercel notifications
-        console.log(`[Vercel Webhook] Push-triggered deploy — skipping notification for ${projectName}`);
-        return NextResponse.json({ received: true, event: eventType });
+        // Push-triggered deploy — keep SHA-based groupKey so it groups with commit
+        isPushTriggered = true;
+        console.log(`[Vercel Webhook] Push-triggered deploy for ${projectName}`);
+      } else {
+        // Redeploy: use deployment ID for unique grouping (not SHA)
+        if (deployment?.id) {
+          notifGroupKey = `vercel:${deployment.id}`;
+        }
+        notifGroupTitle = meta.githubCommitMessage
+          ? `${projectName} — Redeploy: ${meta.githubCommitMessage.split('\n')[0]}`
+          : `${projectName} — Redeploy`;
+        console.log(`[Vercel Webhook] Redeploy detected — groupKey=${notifGroupKey}`);
       }
-
-      // Redeploy: use deployment ID for unique grouping (not SHA)
-      if (deployment?.id) {
-        notifGroupKey = `vercel:${deployment.id}`;
-      }
-      notifGroupTitle = meta.githubCommitMessage
-        ? `${projectName} — Redeploy: ${meta.githubCommitMessage.split('\n')[0]}`
-        : `${projectName} — Redeploy`;
-      console.log(`[Vercel Webhook] Redeploy detected — groupKey=${notifGroupKey}`);
     }
 
-    // Create notification for redeploy / standalone deploy.
+    // Look up alert rule name
     const rulesSnap = await db
       .collection('alert_rules')
       .where('uid', '==', uid)
@@ -223,7 +221,7 @@ export async function POST(request: NextRequest) {
     } else {
       await db.collection('notifications').add(notifData);
     }
-    console.log(`[Vercel Webhook] Upserted notification for ${eventType} (phase=${phase})`);
+    console.log(`[Vercel Webhook] Upserted notification for ${eventType} (phase=${phase}, pushTriggered=${isPushTriggered})`);
 
     // Bump notification counter so SSE stream fires
     await db.collection('notification_counters').doc(uid).set({

@@ -46,6 +46,7 @@ export function useEventSource() {
         const data = (await res.json()) as { tracked: number };
         if (data.tracked > 0) {
           queryClient.invalidateQueries({ queryKey: ['notifications'] });
+          queryClient.invalidateQueries({ queryKey: ['vercel-data'] });
         }
       }
     } catch {
@@ -108,6 +109,10 @@ export function useEventSource() {
         if (!initialLoadRef.current && (data.type === 'push' || data.type === 'ci' || data.type === 'deployment')) {
           startVercelPolling();
         }
+        // Auto-refresh Vercel overview card when deployment events arrive
+        if (!initialLoadRef.current && data.type === 'deployment') {
+          queryClient.invalidateQueries({ queryKey: ['vercel-data'] });
+        }
       } catch {
         // Ignore malformed messages
       }
@@ -130,6 +135,10 @@ export function useEventSource() {
       if (pendingInvalidation.current) clearTimeout(pendingInvalidation.current);
       pendingInvalidation.current = setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        // Auto-refresh Vercel overview card when deployment notifications arrive
+        if (lastSource === 'vercel' || lastEventType === 'deployment') {
+          queryClient.invalidateQueries({ queryKey: ['vercel-data'] });
+        }
         pendingInvalidation.current = null;
       }, 300);
 

@@ -292,6 +292,8 @@ export async function fetchContributionGraph(octokit: Octokit): Promise<Contribu
   }
 }
 
+const WEBHOOK_EVENTS = ['push', 'pull_request', 'check_run', 'deployment', 'deployment_status', 'workflow_run', 'issues', 'star'];
+
 /**
  * Auto-register webhooks on all user-owned repos.
  * Skips repos that already have a webhook pointing at our URL.
@@ -301,9 +303,9 @@ export async function registerWebhooksForUser(
   githubAccessToken: string,
   webhookUrl: string,
   webhookSecret: string,
-): Promise<{ registered: number; skipped: number; errors: number; errorDetails: string[] }> {
+): Promise<{ registered: number; skipped: number; errors: number; errorDetails: string[]; repoNames: string[] }> {
   const octokit = new Octokit({ auth: githubAccessToken });
-  const stats = { registered: 0, skipped: 0, errors: 0, errorDetails: [] as string[] };
+  const stats = { registered: 0, skipped: 0, errors: 0, errorDetails: [] as string[], repoNames: [] as string[] };
 
   const repos: Array<{ full_name: string }> = [];
   try {
@@ -328,7 +330,7 @@ export async function registerWebhooksForUser(
     return stats;
   }
 
-  const WEBHOOK_EVENTS = ['push', 'pull_request', 'check_run', 'deployment', 'deployment_status', 'workflow_run', 'issues', 'star'];
+  stats.repoNames = repos.map((r) => r.full_name);
 
   for (const repo of repos) {
     const [owner, repoName] = repo.full_name.split('/') as [string, string];
@@ -382,4 +384,31 @@ export async function registerWebhooksForUser(
   }
 
   return stats;
+}
+
+/**
+ * Register a webhook on a single repo. Returns true if a new hook was created.
+ * Silently skips if one already exists.
+ */
+export async function registerWebhookForRepo(
+  githubAccessToken: string,
+  repoFullName: string,
+  webhookUrl: string,
+  webhookSecret: string,
+): Promise<boolean> {
+  const octokit = new Octokit({ auth: githubAccessToken });
+  const [owner, repoName] = repoFullName.split('/') as [string, string];
+
+  const { data: hooks } = await octokit.rest.repos.listWebhooks({ owner, repo: repoName });
+  const existing = hooks.find((h) => h.config.url === webhookUrl);
+  if (existing) return false;
+
+  await octokit.rest.repos.createWebhook({
+    owner,
+    repo: repoName,
+    config: { url: webhookUrl, content_type: 'json', secret: webhookSecret },
+    events: WEBHOOK_EVENTS,
+    active: true,
+  });
+  return true;
 }

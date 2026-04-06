@@ -87,7 +87,11 @@ export async function POST(request: NextRequest) {
 
       if (stats.registered > 0 || stats.skipped > 0) {
         await db.collection('users').doc(uid).set(
-          { webhooksRegistered: true, updatedAt: new Date().toISOString() },
+          {
+            webhooksRegistered: true,
+            webhookRepos: stats.repoNames,
+            updatedAt: new Date().toISOString(),
+          },
           { merge: true },
         );
       }

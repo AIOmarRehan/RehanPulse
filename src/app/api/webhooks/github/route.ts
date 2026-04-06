@@ -23,6 +23,41 @@ function notificationDocId(uid: string, groupKey: string, source: string): strin
   return createHash('sha256').update(`${uid}:${groupKey}:${source}`).digest('hex').slice(0, 24);
 }
 
+/**
+ * Detect the deployment provider from GitHub deployment/deployment_status payloads.
+ * GitHub Pages, Vercel, Heroku, etc. each leave distinctive markers.
+ */
+function detectDeploymentProvider(
+  deployment?: Record<string, unknown> | undefined,
+  deploymentStatus?: Record<string, unknown> | undefined,
+): string {
+  const env = (deployment?.environment as string ?? '').toLowerCase();
+  const creator = (deployment?.creator as Record<string, unknown> | undefined)?.login as string ?? '';
+  const statusCreator = (deploymentStatus?.creator as Record<string, unknown> | undefined)?.login as string ?? '';
+  const desc = (deploymentStatus?.description as string ?? '').toLowerCase();
+  const logUrl = (deploymentStatus?.log_url as string ?? '').toLowerCase();
+  const targetUrl = (deploymentStatus?.target_url as string ?? '').toLowerCase();
+  const envUrl = (deploymentStatus?.environment_url as string ?? '').toLowerCase();
+
+  // GitHub Pages
+  if (env.includes('github-pages') || env.includes('github pages')) return 'GitHub Pages';
+  if (creator === 'github-pages[bot]' || statusCreator === 'github-pages[bot]') return 'GitHub Pages';
+
+  // Vercel
+  if (creator === 'vercel[bot]' || statusCreator === 'vercel[bot]') return 'Vercel';
+  if (logUrl.includes('vercel.com') || targetUrl.includes('vercel.com') || envUrl.includes('vercel.com')) return 'Vercel';
+  if (logUrl.includes('vercel.app') || targetUrl.includes('vercel.app') || envUrl.includes('vercel.app')) return 'Vercel';
+
+  // Netlify
+  if (creator === 'netlify[bot]' || statusCreator === 'netlify[bot]') return 'Netlify';
+
+  // Railway
+  if (desc.includes('railway')) return 'Railway';
+
+  // Fallback
+  return 'Deployment';
+}
+
 /** Map GitHub event to a simplified type for storage. */
 function classifyEvent(eventType: string, action?: string): string {
   switch (eventType) {
@@ -125,7 +160,7 @@ export async function POST(request: NextRequest) {
 
     // ── Alert evaluation: check rules and create notifications ──
     console.log(`[Webhook] ${eventType}/${action ?? '-'} → type=${event.type} from ${event.repo ?? 'unknown'} by ${event.sender ?? 'unknown'} uid=${eventUid ?? 'none'}`);
-    await evaluateAlertRules(db, event, eventUid);
+    await evaluateAlertRules(db, event, eventUid, payload);
 
     return NextResponse.json({ received: true, event: event.type });
   } catch (error) {
@@ -240,7 +275,8 @@ function buildSummary(eventType: string, action: string | undefined, payload: un
       const dep = p.deployment as Record<string, unknown> | undefined;
       const env = dep?.environment as string | undefined;
       const creator = (ds?.creator as Record<string, unknown> | undefined)?.login as string | undefined;
-      const parts = [`Vercel: ${state ?? 'updated'}`];
+      const provider = detectDeploymentProvider(dep, ds);
+      const parts = [`${provider}: ${state ?? 'updated'}`];
       if (env) parts.push(`(${env})`);
       parts.push(`in ${repoName}`);
       if (desc) parts.push(`— ${desc}`);
@@ -279,7 +315,8 @@ function buildSummary(eventType: string, action: string | undefined, payload: un
       const dep = p.deployment as Record<string, unknown> | undefined;
       const ref = dep?.ref as string | undefined;
       const env = dep?.environment as string | undefined;
-      return `Vercel: deployment ${action ?? 'created'} in ${repoName}${ref ? ` on ${ref}` : ''}${env ? ` (${env})` : ''}`;
+      const provider = detectDeploymentProvider(dep);
+      return `${provider}: deployment ${action ?? 'created'} in ${repoName}${ref ? ` on ${ref}` : ''}${env ? ` (${env})` : ''}`;
     }
     case 'workflow_run': {
       const wr = p.workflow_run as Record<string, unknown> | undefined;
@@ -320,6 +357,7 @@ async function evaluateAlertRules(
     deploymentState: string | null;
   },
   uid: string | null,
+  payload: unknown,
 ) {
   try {
     // Must have a resolved user to create notifications
@@ -366,11 +404,26 @@ async function evaluateAlertRules(
     }
 
     // Determine notification source for nesting
-    let source: 'commit' | 'github-ci' | 'vercel' = 'commit';
+    // Detect actual provider from the payload so GitHub Pages deployments
+    // are not mislabeled as Vercel
+    let source: 'commit' | 'github-ci' | 'vercel' | 'deployment' = 'commit';
     if (event.type === 'ci') {
       source = 'github-ci';
     } else if (event.type === 'deployment') {
-      source = 'vercel';
+      const p = payload as Record<string, unknown>;
+      const dep = p.deployment as Record<string, unknown> | undefined;
+      const ds = p.deployment_status as Record<string, unknown> | undefined;
+      const provider = detectDeploymentProvider(dep, ds);
+      source = provider === 'Vercel' ? 'vercel' : 'deployment';
+    }
+
+    // Build a default rule name that reflects the actual provider
+    let defaultRuleName = event.type;
+    if (event.type === 'deployment') {
+      const p = payload as Record<string, unknown>;
+      const dep = p.deployment as Record<string, unknown> | undefined;
+      const ds = p.deployment_status as Record<string, unknown> | undefined;
+      defaultRuleName = detectDeploymentProvider(dep, ds) + ' Deployment';
     }
 
     // Find enabled rules for THIS user that match the event type
@@ -395,7 +448,7 @@ async function evaluateAlertRules(
     // Use rule name if available, otherwise a sensible default
     const ruleEntries = matchingRules.length > 0
       ? matchingRules.map((d) => d.data() as { uid: string; name: string; eventType: string })
-      : [{ uid, name: event.type === 'deployment' ? 'Vercel Deployment' : event.type, eventType: event.type }];
+      : [{ uid, name: defaultRuleName, eventType: event.type }];
 
     console.log(`[Alert] Processing ${ruleEntries.length} rule(s) for eventType=${event.type}`);
 

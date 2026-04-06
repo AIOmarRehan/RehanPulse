@@ -1600,7 +1600,7 @@ export function AlertsContent() {
               const getSource = (n: Notification): string => {
                 if (n.source) return n.source;
                 if (n.eventType === 'ci') return 'github-ci';
-                if (n.eventType === 'deployment') return 'vercel';
+                if (n.eventType === 'deployment') return 'deployment';
                 if (n.eventType === 'push') return 'commit';
                 return 'commit';
               };
@@ -1608,7 +1608,7 @@ export function AlertsContent() {
               // Separate commit (parent info) from children (CI/deployment)
               const children = g.items.filter((n) => getSource(n) !== 'commit');
               const ciChildren = g.items.filter((n) => getSource(n) === 'github-ci');
-              const vercelChildren = g.items.filter((n) => getSource(n) === 'vercel');
+              const vercelChildren = g.items.filter((n) => getSource(n) === 'vercel' || getSource(n) === 'deployment');
 
               // Compute parent severity from LATEST notification per source
               // This ensures old in-progress events don't override final results
@@ -1642,7 +1642,21 @@ export function AlertsContent() {
               const allRead = g.items.every((x) => x.read);
 
               // Source section header labels
-              const sourceLabel: Record<string, string> = { 'github-ci': 'GitHub CI', vercel: 'Vercel', commit: 'Commit' };
+              const sourceLabel: Record<string, string> = { 'github-ci': 'GitHub CI', vercel: 'Vercel', deployment: 'Deployment', commit: 'Commit' };
+
+              // Derive a display label for the deployment children group
+              const deployLabel = (() => {
+                if (vercelChildren.length === 0) return 'Deployment';
+                // Use the source of the first deployment child; fall back to message content
+                const firstSrc = getSource(vercelChildren[0]!);
+                if (firstSrc === 'vercel') return 'Vercel';
+                // Check message for provider hints
+                const msg = vercelChildren[0]!.message?.toLowerCase() ?? '';
+                if (msg.includes('github pages')) return 'GitHub Pages';
+                if (msg.includes('netlify')) return 'Netlify';
+                if (msg.includes('railway')) return 'Railway';
+                return 'Deployment';
+              })();
 
               return (
                 <motion.div
@@ -1670,7 +1684,7 @@ export function AlertsContent() {
                         {vercelChildren.length > 0 && (
                           <>
                             <span>&middot;</span>
-                            <span>Vercel: {vercelChildren.length}</span>
+                            <span>{deployLabel}: {vercelChildren.length}</span>
                           </>
                         )}
                         <span>&middot;</span>
@@ -1702,7 +1716,7 @@ export function AlertsContent() {
                       >
                         <div className="relative ml-6 border-l-2 border-gray-200 dark:border-white/10 pb-1">
                           {/* Group items by source, show section headers */}
-                          {(['commit', 'github-ci', 'vercel'] as const).map((src) => {
+                          {(['commit', 'github-ci', 'vercel', 'deployment'] as const).map((src) => {
                             const sectionItems = g.items.filter((n) => getSource(n) === src);
                             if (sectionItems.length === 0) return null;
                             return (
@@ -1712,7 +1726,7 @@ export function AlertsContent() {
                                   <div className="relative py-1.5 pl-5 pr-4">
                                     <div className="absolute left-0 top-[12px] h-px w-4 bg-gray-200 dark:bg-white/10" />
                                     <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-white/25">
-                                      {sourceLabel[src] ?? src}
+                                      {src === 'deployment' ? deployLabel : (sourceLabel[src] ?? src)}
                                     </span>
                                   </div>
                                 )}

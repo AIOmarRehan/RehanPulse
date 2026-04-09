@@ -66,7 +66,7 @@ function LoginContent() {
         )
         .then((res) => {
           if (res.ok) {
-            router.push(redirect);
+            window.location.href = redirect;
           } else {
             redirectingRef.current = false;
             setRedirecting(false);
@@ -85,7 +85,7 @@ function LoginContent() {
     const success = await signInWithGitHub();
     if (success) {
       setRedirecting(true);
-      router.push(redirect);
+      window.location.href = redirect;
       return;
     } else {
       setError('Sign-in failed. Please try again.');

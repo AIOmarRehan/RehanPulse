@@ -748,7 +748,26 @@ export default function HomePage() {
   }, []);
 
   const goLogin = useCallback(() => router.push('/login'), [router]);
-  const goDashboard = useCallback(() => router.push('/'), [router]);
+  const goDashboard = useCallback(async () => {
+    if (!user) { window.location.href = '/login'; return; }
+    try {
+      const idToken = await user.getIdToken(true);
+      const res = await fetch('/api/auth/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ idToken }),
+      });
+      if (res.ok) {
+        // Hard navigate so the middleware sees the fresh cookie
+        window.location.href = '/';
+      } else {
+        window.location.href = '/login';
+      }
+    } catch {
+      window.location.href = '/login';
+    }
+  }, [user]);
 
   const { firstPart, secondPart } = useTypewriter(HERO_SENTENCES);
 

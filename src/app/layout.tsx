@@ -22,8 +22,22 @@ export const metadata: Metadata = {
   title: 'RehanPulse',
   description: 'Developer Activity Command Center',
   icons: {
-    icon: '/icons/web-app-manifest-512x512.png',
-    apple: '/icons/apple-touch-icon.png',
+    icon: [
+      { url: '/icons/favicon.ico', sizes: 'any' },
+      { url: '/icons/favicon.svg', type: 'image/svg+xml' },
+      { url: '/icons/favicon-96x96.png', sizes: '96x96', type: 'image/png' },
+      { url: '/icons/web-app-manifest-192x192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/web-app-manifest-512x512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/icons/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
+  manifest: '/icons/site.webmanifest',
+  appleWebApp: {
+    capable: true,
+    title: 'RehanPulse',
+    statusBarStyle: 'black-translucent',
   },
   verification: {
     google: 'FCJAuIHyxvPNVxnn1OQjiyrVwnwejWRnY9Ubp8F_yIc',
